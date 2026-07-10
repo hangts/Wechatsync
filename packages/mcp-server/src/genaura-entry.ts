@@ -135,10 +135,32 @@ export function toGenAuraAuthResult(
 }
 
 /**
+ * 登录态失效错误匹配模式。
+ *
+ * Wechatsync 适配器在 cookie 过期或失效时返回的 error 字符串各不相同，
+ * 这里集中识别常见的中英文登录态失效表述，以便前端展示"去登录"引导。
+ */
+const AUTH_EXPIRED_PATTERNS: RegExp[] = [
+  /登录.*(超时|过期|失效|重新)/,
+  /session.*(invalid|expired|timeout)/i,
+  /unauthorized/i,
+  /auth.*(expired|invalid|failed)/i,
+  /token.*(expired|invalid)/i,
+  /\b401\b/,
+];
+
+/** 判断错误字符串是否表示登录态失效（cookie 过期/未授权）。 */
+export function isAuthExpiredError(error: string): boolean {
+  return AUTH_EXPIRED_PATTERNS.some((p) => p.test(error));
+}
+
+/**
  * Wechatsync SyncResult → GenAura SyncResult。
  * - platform → platformCode
  * - postUrl → draftUrl（仅存在时）
- * - error 字符串 → { code: 'external_api_error', message }
+ * - error 字符串 → { code, message }：
+ *   - 登录态失效 → code: 'auth_expired'（前端显示"去登录"引导）
+ *   - 其他错误 → code: 'external_api_error'
  */
 export function toGenAuraSyncResult(sr: SyncResult): GenAuraSyncResult {
   const result: GenAuraSyncResult = {
@@ -149,7 +171,10 @@ export function toGenAuraSyncResult(sr: SyncResult): GenAuraSyncResult {
     result.draftUrl = sr.postUrl;
   }
   if (sr.error) {
-    result.error = { code: "external_api_error", message: sr.error };
+    result.error = {
+      code: isAuthExpiredError(sr.error) ? "auth_expired" : "external_api_error",
+      message: sr.error,
+    };
   }
   return result;
 }
@@ -242,12 +267,13 @@ export async function handleCallTool(
               ? `${e.message}\n${e.stack ?? ""}`
               : String(e);
             process.stderr.write(`[genaura-entry] sync_article 平台 ${code} 失败: ${errDetail}\n`);
+            const errMsg = e instanceof Error ? e.message : String(e);
             return {
               platformCode: code,
               success: false,
               error: {
-                code: "external_api_error",
-                message: e instanceof Error ? e.message : String(e),
+                code: isAuthExpiredError(errMsg) ? "auth_expired" : "external_api_error",
+                message: errMsg,
               },
             } satisfies GenAuraSyncResult;
           }
