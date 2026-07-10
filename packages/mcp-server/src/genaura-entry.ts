@@ -91,6 +91,8 @@ export interface CallToolDeps {
   getAdapter: (platformId: string) => Promise<PlatformAdapter | null>;
   /** 注入 cookie 上下文到运行时（url 为适配器 meta.homepage） */
   setCookieContext: (url: string, cookies: SerializedCookie[]) => void;
+  /** 将 Markdown 转换为 HTML（部分平台 API 如 CSDN 要求 content 字段为 HTML） */
+  markdownToHtml: (markdown: string) => string;
 }
 
 // ============================================================================
@@ -228,7 +230,7 @@ export async function handleCallTool(
           }
           deps.setCookieContext(adapter.meta.homepage, cookies);
           try {
-            const article: Article = { title, markdown: content };
+            const article: Article = { title, markdown: content, html: deps.markdownToHtml(content) };
             const sr = await adapter.publish(article, { draftOnly });
             if (!sr.success) {
               process.stderr.write(`[genaura-entry] sync_article 平台 ${code} 适配器返回失败: ${sr.error ?? "(无错误信息)"}\n`);
@@ -271,7 +273,7 @@ export async function handleCallTool(
  * 运行时实例化 NodePublishRuntime 并注册掘金/知乎/CSDN 适配器。
  */
 async function buildDeps(): Promise<CallToolDeps> {
-  const { adapterRegistry } = await import("@wechatsync/core");
+  const { adapterRegistry, markdownToHtml } = await import("@wechatsync/core");
   const { NodePublishRuntime } = await import("./node-publish-runtime.js");
 
   const runtime = new NodePublishRuntime();
@@ -298,6 +300,7 @@ async function buildDeps(): Promise<CallToolDeps> {
     getAdapter: (id: string) => adapterRegistry.get(id),
     setCookieContext: (url: string, cookies: SerializedCookie[]) =>
       runtime.setCookieContext(url, cookies),
+    markdownToHtml,
   };
 }
 
