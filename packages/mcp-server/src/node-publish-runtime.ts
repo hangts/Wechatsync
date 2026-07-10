@@ -188,3 +188,40 @@ export class NodePublishRuntime implements RuntimeInterface {
     },
   };
 }
+
+// ============================================================================
+// Node 环境 Polyfill
+// ============================================================================
+
+/**
+ * 为 Node 环境注入 CodeAdapter 依赖的浏览器 API。
+ *
+ * CodeAdapter 基类的 blobToDataUri() 使用 `new FileReader()` + `readAsDataURL()`，
+ * Node 环境无此 API。用 Blob.arrayBuffer() + Buffer.toString("base64") 实现。
+ * 幂等：若全局已有 FileReader 则跳过。
+ */
+export function ensureNodePolyfills(): void {
+  if (typeof globalThis.FileReader !== "undefined") return;
+
+  // 最小化 FileReader polyfill：仅实现 readAsDataURL（CodeAdapter.blobToDataUri 唯一调用）
+  class FileReaderPolyfill {
+    result: string | ArrayBuffer | null = null;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+
+    readAsDataURL(blob: Blob): void {
+      blob
+        .arrayBuffer()
+        .then((buf) => {
+          const base64 = Buffer.from(new Uint8Array(buf)).toString("base64");
+          this.result = `data:${blob.type || "application/octet-stream"};base64,${base64}`;
+          this.onload?.();
+        })
+        .catch(() => {
+          this.onerror?.();
+        });
+    }
+  }
+
+  (globalThis as { FileReader: unknown }).FileReader = FileReaderPolyfill;
+}

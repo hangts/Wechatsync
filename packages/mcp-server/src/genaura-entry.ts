@@ -270,7 +270,7 @@ export async function handleCallTool(
 
 /**
  * 构建 CallToolDeps：将 adapterRegistry 适配为 handleCallTool 所需的依赖接口。
- * 运行时实例化 NodePublishRuntime 并注册掘金/知乎/CSDN 适配器。
+ * 运行时实例化 NodePublishRuntime 并注册 Wechatsync 全部 18 个文章适配器。
  */
 async function buildDeps(): Promise<CallToolDeps> {
   const { adapterRegistry, markdownToHtml } = await import("@wechatsync/core");
@@ -279,21 +279,33 @@ async function buildDeps(): Promise<CallToolDeps> {
   const runtime = new NodePublishRuntime();
   adapterRegistry.setRuntime(runtime);
 
-  // 注册适配器（设计文档 §4.6/§4.7：掘金 100% 复用，知乎/CSDN 注册即用）
+  // 导入 Wechatsync 全部公开文章适配器（跳过 ZipDownloadAdapter，非发布用途）
+  const {
+    JuejinAdapter, ZhihuAdapter, CSDNAdapter,
+    WeiboAdapter, BilibiliAdapter, BaijiahaoAdapter,
+    YuqueAdapter, WeixinAdapter, Cto51Adapter,
+    ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
+    CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
+    SohuAdapter, WoshipmAdapter, EastmoneyAdapter,
+  } = await import("@wechatsync/core");
+
   // 适配器构造函数无参，meta 为类实例属性；registry 在 get() 中调用 init(runtime) 注入运行时
-  const { JuejinAdapter, ZhihuAdapter, CSDNAdapter } = await import("@wechatsync/core");
-  adapterRegistry.register({
-    meta: new JuejinAdapter().meta,
-    factory: () => new JuejinAdapter(),
-  });
-  adapterRegistry.register({
-    meta: new ZhihuAdapter().meta,
-    factory: () => new ZhihuAdapter(),
-  });
-  adapterRegistry.register({
-    meta: new CSDNAdapter().meta,
-    factory: () => new CSDNAdapter(),
-  });
+  const AdapterClasses = [
+    JuejinAdapter, ZhihuAdapter, CSDNAdapter,
+    WeiboAdapter, BilibiliAdapter, BaijiahaoAdapter,
+    YuqueAdapter, WeixinAdapter, Cto51Adapter,
+    ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
+    CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
+    SohuAdapter, WoshipmAdapter, EastmoneyAdapter,
+  ];
+
+  for (const AdapterClass of AdapterClasses) {
+    const instance = new AdapterClass();
+    adapterRegistry.register({
+      meta: instance.meta,
+      factory: () => new AdapterClass(),
+    });
+  }
 
   return {
     getAllMeta: () => adapterRegistry.getAllMeta(),
@@ -318,6 +330,10 @@ async function main(): Promise<void> {
   console.info = (...args: unknown[]) => process.stderr.write(fmt(args) + "\n");
   console.debug = (...args: unknown[]) => process.stderr.write(fmt(args) + "\n");
   void origLog;
+
+  // 注入 Node 环境 polyfill（FileReader 等），CodeAdapter 基类的 blobToDataUri 依赖
+  const { ensureNodePolyfills } = await import("./node-publish-runtime.js");
+  ensureNodePolyfills();
 
   const { Server } = await import("@modelcontextprotocol/sdk/server/index.js");
   const { StdioServerTransport } = await import(
