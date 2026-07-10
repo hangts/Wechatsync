@@ -28,9 +28,10 @@ export default defineConfig([
     sourcemap: true,
     dts: true,
   },
-  // GenAura 投放独立进程入口（全量 bundle，自包含运行）
-  // noExternal: true 将所有依赖（@wechatsync/core、linkedom 等）打包进单文件，
-  // 避免子进程运行时的 ESM 模块解析问题（core/src 下 import 无 .js 扩展名）
+  // GenAura 投放独立进程入口（全量 bundle，单文件自包含运行）
+  // noExternal: 全量打包所有依赖（@wechatsync/core、linkedom 等），避免子进程
+  // 运行时的 ESM 模块解析问题（core/src 下 import 无 .js 扩展名）。
+  // splitting: false 禁止代码分割，产出单文件，无需随包分发 chunk 文件。
   {
     entry: ['src/genaura-entry.ts'],
     format: ['esm'],
@@ -39,6 +40,7 @@ export default defineConfig([
     sourcemap: true,
     dts: false,
     noExternal: [/.*/],
+    splitting: false,
     banner: {
       js: GENAURA_BANNER,
     },
