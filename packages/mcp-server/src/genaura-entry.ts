@@ -13,13 +13,14 @@
  * - 纯逻辑层（toGenAura* / handleCallTool）：无运行时外部依赖，顶层均为 `import type`，
  *   vitest 加载本文件时不会触发 @wechatsync/core / @modelcontextprotocol/sdk 的真实加载。
  * - main()：通过动态 import() 按需加载运行时依赖，仅在子进程入口执行（由
- *   `process.argv[1] === import.meta.url` 守卫，测试中永不触发）。
+ *   `process.argv[1] === fileURLToPath(import.meta.url)` 守卫，测试中永不触发）。
  */
 
 // ============================================================================
 // 类型导入（运行时擦除，vitest 加载本文件时不触发真实模块加载）
 // ============================================================================
 
+import { fileURLToPath } from "node:url";
 import type {
   PlatformMeta,
   AuthResult,
@@ -360,8 +361,9 @@ async function main(): Promise<void> {
   await server.connect(new StdioServerTransport());
 }
 
-// ESM 入口守卫：仅当本文件作为子进程入口执行时启动 server，测试中 import 不触发
-if (process.argv[1] === import.meta.url) {
+// ESM 入口守卫：仅当本文件作为子进程入口执行时启动 server，测试中 import 不触发。
+// 注意：import.meta.url 是 file:// URL，必须用 fileURLToPath 转换为路径才能与 process.argv[1] 比较。
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((err) => {
     console.error("[genaura-entry] fatal:", err);
     process.exit(1);
