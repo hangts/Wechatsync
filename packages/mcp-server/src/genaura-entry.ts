@@ -72,10 +72,11 @@ interface SerializedCookie {
 // MCP 工具结果类型
 // ============================================================================
 
-/** MCP callTool 返回结果形状 */
+/** MCP callTool 返回结果形状（镜像 SDK CallToolResult，含 Result 索引签名） */
 export interface McpToolResult {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
+  [key: string]: unknown;
 }
 
 // ============================================================================
