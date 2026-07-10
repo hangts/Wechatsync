@@ -96,6 +96,12 @@ export class WeixinAdapter extends CodeAdapter {
       const ticketMatch = html.match(/ticket:\s*["']([^"']+)["']/)
       const userNameMatch = html.match(/user_name:\s*["']([^"']+)["']/)
       const nickNameMatch = html.match(/nick_name:\s*["']([^"']+)["']/)
+
+      // userName 为空说明用户未真正登录（未登录页面的 HTML 可能恰好包含 token 格式字符串）
+      if (!userNameMatch || !userNameMatch[1]) {
+        logger.debug(' No userName found, not authenticated')
+        return { isAuthenticated: false }
+      }
       const timeMatch = html.match(/time:\s*["'](\d+)["']/)
       const headImgMatch = html.match(/head_img:\s*['"]([^'"]+)['"]/)
 
