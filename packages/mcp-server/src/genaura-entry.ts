@@ -230,8 +230,16 @@ export async function handleCallTool(
           try {
             const article: Article = { title, markdown: content };
             const sr = await adapter.publish(article, { draftOnly });
+            if (!sr.success) {
+              process.stderr.write(`[genaura-entry] sync_article 平台 ${code} 适配器返回失败: ${sr.error ?? "(无错误信息)"}\n`);
+            }
             return toGenAuraSyncResult(sr);
           } catch (e) {
+            // 输出详细错误到 stderr（不污染 stdout MCP 通道），便于排查适配器失败原因
+            const errDetail = e instanceof Error
+              ? `${e.message}\n${e.stack ?? ""}`
+              : String(e);
+            process.stderr.write(`[genaura-entry] sync_article 平台 ${code} 失败: ${errDetail}\n`);
             return {
               platformCode: code,
               success: false,
@@ -300,10 +308,12 @@ async function buildDeps(): Promise<CallToolDeps> {
 async function main(): Promise<void> {
   // MCP 协议通过 stdout 传输 JSON-RPC 消息，适配器的 console.log 会污染通道。
   // 将 console.log/info/debug 重定向到 stderr，console.warn/error 默认已到 stderr。
+  // 对象用 JSON.stringify 序列化（String(obj) 会输出 [object Object] 丢失信息）。
+  const fmt = (args: unknown[]) => args.map(a => typeof a === "string" ? a : JSON.stringify(a)).join(" ");
   const origLog = console.log;
-  console.log = (...args: unknown[]) => process.stderr.write(args.map(String).join(" ") + "\n");
-  console.info = (...args: unknown[]) => process.stderr.write(args.map(String).join(" ") + "\n");
-  console.debug = (...args: unknown[]) => process.stderr.write(args.map(String).join(" ") + "\n");
+  console.log = (...args: unknown[]) => process.stderr.write(fmt(args) + "\n");
+  console.info = (...args: unknown[]) => process.stderr.write(fmt(args) + "\n");
+  console.debug = (...args: unknown[]) => process.stderr.write(fmt(args) + "\n");
   void origLog;
 
   const { Server } = await import("@modelcontextprotocol/sdk/server/index.js");
