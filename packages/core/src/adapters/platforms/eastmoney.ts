@@ -159,8 +159,10 @@ export class EastmoneyAdapter extends CodeAdapter {
       await this.fetchToken();
       logger.info("Starting publish to eastmoney...");
 
+      const isPublish = options?.draftOnly === false;
+
       // 1. 创建空草稿，获取 draft_id
-      const draftId = await this.createDraft(article.title);
+      const draftId = await this.createDraft(article.title, isPublish);
       logger.debug("Draft created:", draftId);
 
       // 2. 处理图片（基于预处理后的 HTML）
@@ -174,7 +176,7 @@ export class EastmoneyAdapter extends CodeAdapter {
       );
 
       // 3. 更新草稿内容
-      await this.updateDraft(draftId, article.title, content);
+      await this.updateDraft(draftId, article.title, content, isPublish);
       logger.debug("Draft updated");
 
       const draftUrl = `https://mp.eastmoney.com/collect/pc_article/index.html#/?id=${draftId}`;
@@ -182,7 +184,7 @@ export class EastmoneyAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: draftId,
         postUrl: draftUrl,
-        draftOnly: options?.draftOnly ?? true,
+        draftOnly: isPublish ? false : true,
       });
     }).catch((error) =>
       this.createResult(false, {
@@ -196,7 +198,7 @@ export class EastmoneyAdapter extends CodeAdapter {
     draftid?: string;
     title: string;
     text: string;
-  }): Promise<object[]> {
+  }, drafttype?: string): Promise<object[]> {
     const deviceid = await this.getDeviceId();
     return [
       { ip: "$IP$" },
@@ -207,7 +209,7 @@ export class EastmoneyAdapter extends CodeAdapter {
       { ctoken: this.ctoken },
       { utoken: this.utoken },
       { draftid: params.draftid ?? "" },
-      { drafttype: "0" },
+      { drafttype: drafttype ?? "0" },
       { type: "0" },
       { title: encodeURIComponent(params.title) },
       { text: encodeURIComponent(params.text) },
@@ -226,14 +228,15 @@ export class EastmoneyAdapter extends CodeAdapter {
   }
 
   /** 调用草稿 API */
-  private async callDraftApi(parm: object[], draftId?: string): Promise<DraftResult> {
+  private async callDraftApi(parm: object[], draftId?: string, publish?: boolean): Promise<DraftResult> {
     const pageUrl = draftId
       ? `https://mp.eastmoney.com/collect/pc_article/index.html#/?id=${draftId}`
       : "https://mp.eastmoney.com/collect/pc_article/index.html#/";
 
+    // TODO: 发布参数需要实际测试验证
     const body = JSON.stringify({
       pageUrl,
-      path: "draft/api/Article/SaveDraft",
+      path: publish ? "draft/api/Article/SavePublish" : "draft/api/Article/SaveDraft",
       parm: JSON.stringify(parm),
     });
 
@@ -283,12 +286,15 @@ export class EastmoneyAdapter extends CodeAdapter {
     return innerData;
   }
 
-  private async createDraft(title: string): Promise<string> {
-    const parm = await this.buildParm({
-      title,
-      text: '<div class="xeditor_content cfh_web"></div>',
-    });
-    const result = await this.callDraftApi(parm);
+  private async createDraft(title: string, publish?: boolean): Promise<string> {
+    const parm = await this.buildParm(
+      {
+        title,
+        text: '<div class="xeditor_content cfh_web"></div>',
+      },
+      publish ? "1" : undefined,
+    );
+    const result = await this.callDraftApi(parm, undefined, publish);
     if (!result.draft_id) {
       throw new Error("创建草稿失败: 响应缺少 draft_id");
     }
@@ -299,13 +305,17 @@ export class EastmoneyAdapter extends CodeAdapter {
     draftId: string,
     title: string,
     content: string,
+    publish?: boolean,
   ): Promise<void> {
-    const parm = await this.buildParm({
-      draftid: draftId,
-      title,
-      text: `<div class="xeditor_content cfh_web">${content}</div>`,
-    });
-    await this.callDraftApi(parm, draftId);
+    const parm = await this.buildParm(
+      {
+        draftid: draftId,
+        title,
+        text: `<div class="xeditor_content cfh_web">${content}</div>`,
+      },
+      publish ? "1" : undefined,
+    );
+    await this.callDraftApi(parm, draftId, publish);
   }
 
   /** URL 上传图片 */

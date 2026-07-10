@@ -197,9 +197,9 @@ export class WeiboAdapter extends CodeAdapter {
             isreward: '1',
             pay_setting: '{"ispay":0,"isvclub":0}',
             source: '0',
-            action: '1',
+            action: options?.draftOnly === false ? '0' : '1',
             content_type: '0',
-            save: '1',
+            save: options?.draftOnly === false ? '0' : '1',
           }),
         }
       )
@@ -215,12 +215,14 @@ export class WeiboAdapter extends CodeAdapter {
         throw new Error(saveRes.msg || `保存失败 (错误码: ${code})`)
       }
 
+      const isPublish = options?.draftOnly === false
       const draftUrl = `https://card.weibo.com/article/v5/editor#/draft/${postId}`
+      const articleUrl = `https://card.weibo.com/article/v5/editor#/published/${postId}`
 
       return this.createResult(true, {
         postId: postId,
-        postUrl: draftUrl,
-        draftOnly: options?.draftOnly ?? true,
+        postUrl: isPublish ? articleUrl : draftUrl,
+        draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {
       error: (error as Error).message,

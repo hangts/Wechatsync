@@ -176,7 +176,7 @@ export class CnblogsAdapter extends CodeAdapter {
           inSiteHome: false,
           siteCategoryId: null,
           blogTeamIds: null,
-          isPublished: false,
+          isPublished: options?.draftOnly === false,
           displayOnHomePage: false,
           isAllowComments: true,
           includeInMainSyndication: false,
@@ -193,7 +193,7 @@ export class CnblogsAdapter extends CodeAdapter {
           datePublished: new Date().toISOString(),
           dateUpdated: null,
           isMarkdown: true,
-          isDraft: true,
+          isDraft: options?.draftOnly !== false,
           autoDesc: null,
           changePostType: false,
           blogId: 0,
@@ -232,14 +232,16 @@ export class CnblogsAdapter extends CodeAdapter {
       }
 
       const postId = String(responseData.id)
+      const isPublish = options?.draftOnly === false
       const draftUrl = `https://i.cnblogs.com/articles/edit;postId=${postId}`
+      const articleUrl = `https://www.cnblogs.com/p/${postId}.html`
 
       logger.debug('Draft created:', postId)
 
       return this.createResult(true, {
         postId,
-        postUrl: draftUrl,
-        draftOnly: options?.draftOnly ?? true,
+        postUrl: isPublish ? articleUrl : draftUrl,
+        draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {
       error: (error as Error).message,

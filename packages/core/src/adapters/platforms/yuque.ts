@@ -133,7 +133,7 @@ export class YuqueAdapter extends CodeAdapter {
             type: 'Doc',
             format: 'lake',
             book_id: this.bookId,
-            status: 0,
+            status: options?.draftOnly === false ? 1 : 0,
           }),
         }
       )
@@ -217,12 +217,14 @@ export class YuqueAdapter extends CodeAdapter {
       const saveRes = await saveResponse.json()
       logger.debug('Save response:', saveRes)
 
+      const isPublish = options?.draftOnly === false
       const draftUrl = `https://www.yuque.com/go/doc/${postId}/edit`
+      const articleUrl = `https://www.yuque.com/go/doc/${postId}`
 
       return this.createResult(true, {
         postId: String(postId),
-        postUrl: draftUrl,
-        draftOnly: options?.draftOnly ?? true,
+        postUrl: isPublish ? articleUrl : draftUrl,
+        draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {
       error: (error as Error).message,

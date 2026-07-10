@@ -225,7 +225,7 @@ export class CSDNAdapter extends CodeAdapter {
             readType: 'public',
             level: 0,
             tags: '',
-            status: 2, // 草稿
+            status: options?.draftOnly === false ? 0 : 2, // 0=发布, 2=草稿
             categories: '',
             type: 'original',
             original_link: '',
@@ -237,7 +237,7 @@ export class CSDNAdapter extends CodeAdapter {
             is_new: 1,
             vote_id: 0,
             resource_id: '',
-            pubStatus: 'draft',
+            pubStatus: options?.draftOnly === false ? 'publish' : 'draft',
             creator_activity_id: '',
           }),
         }
@@ -257,12 +257,14 @@ export class CSDNAdapter extends CodeAdapter {
       }
 
       const postId = res.data.id
+      const isPublish = options?.draftOnly === false
       const draftUrl = `https://editor.csdn.net/md?articleId=${postId}`
+      const articleUrl = `https://blog.csdn.net/article/details/${postId}`
 
       return this.createResult(true, {
         postId: postId,
-        postUrl: draftUrl,
-        draftOnly: options?.draftOnly ?? true,
+        postUrl: isPublish ? articleUrl : draftUrl,
+        draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {
       error: (error as Error).message,

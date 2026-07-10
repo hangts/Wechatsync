@@ -137,7 +137,7 @@ export class WoshipmAdapter extends CodeAdapter {
             'X-Requested-With': 'XMLHttpRequest',
           },
           body: new URLSearchParams({
-            action: 'add_draft',
+            action: options?.draftOnly === false ? 'publish_post' : 'add_draft',
             post_title: article.title,
             post_content: content,
           }),
@@ -164,6 +164,7 @@ export class WoshipmAdapter extends CodeAdapter {
       }
 
       const draftId = String(createData.post_id)
+      const isPublish = options?.draftOnly === false
       const draftUrl = createData.url || `https://www.woshipm.com/writing?pid=${draftId}`
 
       logger.debug('Draft created:', draftId)
@@ -171,7 +172,7 @@ export class WoshipmAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: draftId,
         postUrl: draftUrl,
-        draftOnly: options?.draftOnly ?? true,
+        draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {
       error: (error as Error).message,
