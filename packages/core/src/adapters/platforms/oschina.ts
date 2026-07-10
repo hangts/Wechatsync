@@ -4,6 +4,10 @@
  */
 import { CodeAdapter, ImageUploadResult } from '../code-adapter'
 import type { Article, AuthResult, SyncResult, PlatformMeta } from '../../types'
+import type { PublishOptions } from '../types'
+import { createLogger } from '../../lib/logger'
+
+const logger = createLogger('Oschina')
 export class OschinaAdapter extends CodeAdapter {
   meta: PlatformMeta = {
     id: 'oschina',
@@ -120,7 +124,7 @@ export class OschinaAdapter extends CodeAdapter {
   /**
    * 发布文章
    */
-  async publish(article: Article): Promise<SyncResult> {
+  async publish(article: Article, options?: PublishOptions): Promise<SyncResult> {
     const now = Date.now()
 
     return this.withHeaderRules(this.HEADER_RULES, async () => {
@@ -171,13 +175,72 @@ export class OschinaAdapter extends CodeAdapter {
       }
 
       const draftId = String(res.result.id)
+      const draftUrl = `https://my.oschina.net/u/${this.userId}/blog/write/draft/${draftId}`
 
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            'https://apiv1.oschina.net/oschinapi/api/article/publish',
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                id: Number(draftId),
+                user: Number(this.userId),
+              }),
+            }
+          )
+          if (publishResponse.ok) {
+            const articleUrl = `https://my.oschina.net/u/${this.userId}/blog/${draftId}`
+            logger.debug('Publish success:', articleUrl)
+            return {
+              platform: this.meta.id,
+              success: true,
+              postId: draftId,
+              postUrl: articleUrl,
+              draftOnly: false,
+              timestamp: now,
+            }
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return {
+            platform: this.meta.id,
+            success: true,
+            postId: draftId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+            timestamp: now,
+          }
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return {
+            platform: this.meta.id,
+            success: true,
+            postId: draftId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+            timestamp: now,
+          }
+        }
+      }
+
+      // 草稿模式
       return {
         platform: this.meta.id,
         success: true,
         postId: draftId,
-        postUrl: `https://my.oschina.net/u/${this.userId}/blog/write/draft/${draftId}`,
-        draftOnly: true,
+        postUrl: draftUrl,
+        draftOnly: options?.draftOnly ?? true,
         timestamp: now,
       }
     }).catch((error) => ({

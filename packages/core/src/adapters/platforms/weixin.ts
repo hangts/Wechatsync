@@ -263,9 +263,74 @@ export class WeixinAdapter extends CodeAdapter {
       }
 
       const draftUrl = `https://mp.weixin.qq.com/cgi-bin/appmsg?t=media/appmsg_edit&action=edit&type=77&appmsgid=${res.appMsgId}&token=${this.weixinMeta!.token}&lang=zh_CN`
+      const postId = res.appMsgId
 
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            `https://mp.weixin.qq.com/cgi-bin/freepublish/submit?token=${this.weixinMeta!.token}&lang=zh_CN`,
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                token: this.weixinMeta!.token,
+                lang: 'zh_CN',
+                f: 'json',
+                ajax: '1',
+                random: String(Math.random()),
+                media_id: postId,
+              }),
+            }
+          )
+          if (publishResponse.ok) {
+            const publishRes = await publishResponse.json() as { base_resp?: { ret: number; err_msg?: string } }
+            if (publishRes.base_resp?.ret === 0) {
+              logger.debug('Publish success, media_id:', postId)
+              return this.createResult(true, {
+                postId: postId,
+                postUrl: draftUrl,
+                draftOnly: false,
+              })
+            }
+            // 发布失败，返回草稿
+            const errMsg = publishRes.base_resp?.err_msg || '发布失败'
+            logger.warn('Publish failed, falling back to draft:', errMsg)
+            return this.createResult(true, {
+              postId: postId,
+              postUrl: draftUrl,
+              draftOnly: true,
+              error: `发布失败: ${errMsg}`,
+            })
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return this.createResult(true, {
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+          })
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return this.createResult(true, {
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+          })
+        }
+      }
+
+      // 草稿模式
       return this.createResult(true, {
-        postId: res.appMsgId,
+        postId: postId,
         postUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
       })

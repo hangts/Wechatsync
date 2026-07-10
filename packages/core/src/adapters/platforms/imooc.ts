@@ -4,6 +4,10 @@
  */
 import { CodeAdapter, ImageUploadResult } from '../code-adapter'
 import type { Article, AuthResult, SyncResult, PlatformMeta } from '../../types'
+import type { PublishOptions } from '../types'
+import { createLogger } from '../../lib/logger'
+
+const logger = createLogger('Imooc')
 export class ImoocAdapter extends CodeAdapter {
   meta: PlatformMeta = {
     id: 'imooc',
@@ -104,7 +108,7 @@ export class ImoocAdapter extends CodeAdapter {
   /**
    * 发布文章
    */
-  async publish(article: Article): Promise<SyncResult> {
+  async publish(article: Article, options?: PublishOptions): Promise<SyncResult> {
     const now = Date.now()
     return this.withHeaderRules(this.HEADER_RULES, async () => {
       // 优先使用 markdown，处理图片
@@ -131,12 +135,72 @@ export class ImoocAdapter extends CodeAdapter {
         throw new Error('发布失败')
       }
 
+      const postId = res.data
+      const draftUrl = `https://www.imooc.com/article/draft/id/${postId}`
+
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch('https://www.imooc.com/article/savepublish', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              editor: '0',
+              draft_id: String(postId),
+              title: article.title,
+              content: content,
+            }),
+          })
+          if (publishResponse.ok) {
+            const articleUrl = `https://www.imooc.com/article/${postId}`
+            logger.debug('Publish success:', articleUrl)
+            return {
+              platform: this.meta.id,
+              success: true,
+              postId: postId,
+              postUrl: articleUrl,
+              draftOnly: false,
+              timestamp: now,
+            }
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return {
+            platform: this.meta.id,
+            success: true,
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+            timestamp: now,
+          }
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return {
+            platform: this.meta.id,
+            success: true,
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+            timestamp: now,
+          }
+        }
+      }
+
+      // 草稿模式
       return {
         platform: this.meta.id,
         success: true,
-        postId: res.data,
-        postUrl: `https://www.imooc.com/article/draft/id/${res.data}`,
-        draftOnly: true,
+        postId: postId,
+        postUrl: draftUrl,
+        draftOnly: options?.draftOnly ?? true,
         timestamp: now,
       }
     }).catch((error) => ({

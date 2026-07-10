@@ -4,6 +4,10 @@
  */
 import { CodeAdapter, ImageUploadResult } from '../code-adapter'
 import type { Article, AuthResult, SyncResult, PlatformMeta } from '../../types'
+import type { PublishOptions } from '../types'
+import { createLogger } from '../../lib/logger'
+
+const logger = createLogger('Segmentfault')
 export class SegmentfaultAdapter extends CodeAdapter {
   meta: PlatformMeta = {
     id: 'segmentfault',
@@ -159,7 +163,7 @@ export class SegmentfaultAdapter extends CodeAdapter {
   /**
    * 发布文章
    */
-  async publish(article: Article): Promise<SyncResult> {
+  async publish(article: Article, options?: PublishOptions): Promise<SyncResult> {
     const now = Date.now()
     return this.withHeaderRules(this.HEADER_RULES, async () => {
       // 获取 session token
@@ -202,6 +206,7 @@ export class SegmentfaultAdapter extends CodeAdapter {
       }
 
       // 处理数组格式响应 [1, "error_message"]
+      let postId: string | number
       if (Array.isArray(res)) {
         if (res[0] === 1) {
           throw new Error(res[1] || '发布失败')
@@ -209,29 +214,87 @@ export class SegmentfaultAdapter extends CodeAdapter {
         // [0, data] 成功格式
         const data = res[1]
         if (data?.id) {
+          postId = data.id
+        } else {
+          throw new Error('发布失败')
+        }
+      } else {
+        if (!res.id) {
+          // 尝试多种错误字段
+          const errorMsg = res.message || res.msg || res.error || res.errMsg || JSON.stringify(res)
+          throw new Error(errorMsg)
+        }
+        postId = res.id
+      }
+
+      const draftUrl = `https://segmentfault.com/write?draftId=${postId}`
+
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch('https://segmentfault.com/gateway/article', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              token: this.sessionToken,
+              accept: '*/*',
+            },
+            body: JSON.stringify({
+              title: article.title,
+              tags: [],
+              text: content,
+              object_id: String(postId),
+              type: 'article',
+            }),
+          })
+          if (publishResponse.ok) {
+            const articleUrl = `https://segmentfault.com/a/${postId}`
+            logger.debug('Publish success:', articleUrl)
+            return {
+              platform: this.meta.id,
+              success: true,
+              postId: String(postId),
+              postUrl: articleUrl,
+              draftOnly: false,
+              timestamp: now,
+            }
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
           return {
             platform: this.meta.id,
             success: true,
-            postId: data.id,
-            postUrl: `https://segmentfault.com/write?draftId=${data.id}`,
+            postId: String(postId),
+            postUrl: draftUrl,
             draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+            timestamp: now,
+          }
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return {
+            platform: this.meta.id,
+            success: true,
+            postId: String(postId),
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
             timestamp: now,
           }
         }
       }
 
-      if (!res.id) {
-        // 尝试多种错误字段
-        const errorMsg = res.message || res.msg || res.error || res.errMsg || JSON.stringify(res)
-        throw new Error(errorMsg)
-      }
-
+      // 草稿模式
       return {
         platform: this.meta.id,
         success: true,
-        postId: res.id,
-        postUrl: `https://segmentfault.com/write?draftId=${res.id}`,
-        draftOnly: true,
+        postId: String(postId),
+        postUrl: draftUrl,
+        draftOnly: options?.draftOnly ?? true,
         timestamp: now,
       }
     }).catch((error) => ({

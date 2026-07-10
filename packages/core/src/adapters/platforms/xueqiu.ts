@@ -206,6 +206,68 @@ export class XueqiuAdapter extends CodeAdapter {
       const postId = res.id
       const draftUrl = `https://mp.xueqiu.com/write/draft/${postId}`
 
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            'https://mp.xueqiu.com/xq/statuses/update.json',
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                text: content,
+                title: article.title,
+                status_id: String(postId),
+              }),
+            }
+          )
+          if (publishResponse.ok) {
+            const publishRes = await publishResponse.json() as { id?: string | number; error_description?: string }
+            if (publishRes.id) {
+              const articleUrl = `https://xueqiu.com/${this.currentUser!.id}/${publishRes.id}`
+              logger.debug('Publish success:', articleUrl)
+              return this.createResult(true, {
+                postId: String(publishRes.id),
+                postUrl: articleUrl,
+                draftOnly: false,
+              })
+            }
+            // 发布失败，返回草稿
+            const errMsg = publishRes.error_description || '发布失败'
+            logger.warn('Publish failed, falling back to draft:', errMsg)
+            return this.createResult(true, {
+              postId: String(postId),
+              postUrl: draftUrl,
+              draftOnly: true,
+              error: `发布失败: ${errMsg}`,
+            })
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return this.createResult(true, {
+            postId: String(postId),
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+          })
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return this.createResult(true, {
+            postId: String(postId),
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+          })
+        }
+      }
+
+      // 草稿模式
       return this.createResult(true, {
         postId: String(postId),
         postUrl: draftUrl,

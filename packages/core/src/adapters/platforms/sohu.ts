@@ -224,6 +224,70 @@ export class SohuAdapter extends CodeAdapter {
       const postId = res.data
       const draftUrl = `https://mp.sohu.com/mpfe/v4/contentManagement/news/addarticle?spm=smmp.articlelist.0.0&contentStatus=2&id=${postId}`
 
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            `https://mp.sohu.com/mpbp/bp/news/v4/news/publish/v2?accountId=${this.accountInfo!.id}`,
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'dv-id': this.deviceId,
+                'sp-cm': this.spCm,
+              },
+              body: JSON.stringify({
+                id: Number(postId),
+                accountId: Number(this.accountInfo!.id),
+              }),
+            }
+          )
+          if (publishResponse.ok) {
+            const publishRes = await publishResponse.json() as { success?: boolean; msg?: string }
+            if (publishRes.success) {
+              const articleUrl = `https://www.sohu.com/a/${postId}`
+              logger.debug('Publish success:', articleUrl)
+              return this.createResult(true, {
+                postId: String(postId),
+                postUrl: articleUrl,
+                draftOnly: false,
+              })
+            }
+            // 发布失败，返回草稿
+            const errMsg = publishRes.msg || '发布失败'
+            logger.warn('Publish failed, falling back to draft:', errMsg)
+            return this.createResult(true, {
+              postId: String(postId),
+              postUrl: draftUrl,
+              draftOnly: true,
+              error: `发布失败: ${errMsg}`,
+            })
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return this.createResult(true, {
+            postId: String(postId),
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+          })
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return this.createResult(true, {
+            postId: String(postId),
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+          })
+        }
+      }
+
+      // 草稿模式
       return this.createResult(true, {
         postId: String(postId),
         postUrl: draftUrl,

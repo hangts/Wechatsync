@@ -135,9 +135,59 @@ export class BilibiliAdapter extends CodeAdapter {
       }
 
       const draftUrl = `https://member.bilibili.com/platform/upload/text/edit?aid=${res.data.aid}`
+      const postId = String(res.data.aid)
 
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            'https://api.bilibili.com/x/article/creative/article/submit',
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                aid: postId,
+                csrf: this.csrf,
+              }),
+            }
+          )
+          if (publishResponse.ok) {
+            const articleUrl = `https://www.bilibili.com/read/cv${postId}`
+            logger.debug('Publish success:', articleUrl)
+            return this.createResult(true, {
+              postId: postId,
+              postUrl: articleUrl,
+              draftOnly: false,
+            })
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return this.createResult(true, {
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+          })
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return this.createResult(true, {
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+          })
+        }
+      }
+
+      // 草稿模式
       return this.createResult(true, {
-        postId: String(res.data.aid),
+        postId: postId,
         postUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
       })

@@ -275,6 +275,62 @@ export class JuejinAdapter extends CodeAdapter {
 
       const draftUrl = `https://juejin.cn/editor/drafts/${draftId}`
 
+      // 正式发布（草稿模式跳过）
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            'https://api.juejin.cn/content_api/v1/article/publish',
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-secsdk-csrf-token': csrfToken,
+              },
+              body: JSON.stringify({
+                draft_id: draftId,
+                sync_to_org: false,
+                column_ids: [],
+                theme_ids: [],
+              }),
+            }
+          )
+          const publishText = await publishResponse.text()
+          logger.debug('Publish response:', publishResponse.status, publishText.substring(0, 200))
+
+          const publishData = JSON.parse(publishText) as { err_no?: number; err_msg?: string; data?: { job_id: string } }
+
+          if (publishData.err_no && publishData.err_no !== 0) {
+            // 发布失败，返回草稿 + 错误信息
+            logger.warn('Publish failed, falling back to draft:', publishData.err_msg)
+            return this.createResult(true, {
+              postId: draftId,
+              postUrl: draftUrl,
+              draftOnly: true,
+              error: publishData.err_msg || `发布失败: 错误码 ${publishData.err_no}`,
+            })
+          }
+
+          const articleUrl = `https://juejin.cn/post/${publishData.data?.job_id}`
+          logger.debug('Publish success:', articleUrl)
+          return this.createResult(true, {
+            postId: publishData.data?.job_id ?? draftId,
+            postUrl: articleUrl,
+            draftOnly: false,
+          })
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return this.createResult(true, {
+            postId: draftId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+          })
+        }
+      }
+
+      // 草稿模式
       return this.createResult(true, {
         postId: draftId,
         postUrl: draftUrl,

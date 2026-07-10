@@ -155,6 +155,56 @@ export class BaijiahaoAdapter extends CodeAdapter {
       const postId = res.ret.article_id
       const draftUrl = `https://baijiahao.baidu.com/builder/rc/edit?type=news&article_id=${postId}`
 
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            'https://baijiahao.baidu.com/pcui/article/publish',
+            {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'token': this.authToken,
+              },
+              body: new URLSearchParams({
+                article_id: postId,
+                type: 'news',
+              }),
+            }
+          )
+          if (publishResponse.ok) {
+            const articleUrl = `https://baijiahao.baidu.com/s?id=${postId}`
+            logger.debug('Publish success:', articleUrl)
+            return this.createResult(true, {
+              postId: postId,
+              postUrl: articleUrl,
+              draftOnly: false,
+            })
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return this.createResult(true, {
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+          })
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return this.createResult(true, {
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+          })
+        }
+      }
+
+      // 草稿模式
       return this.createResult(true, {
         postId: postId,
         postUrl: draftUrl,

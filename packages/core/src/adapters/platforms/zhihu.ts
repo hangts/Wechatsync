@@ -178,6 +178,50 @@ export class ZhihuAdapter extends CodeAdapter {
 
       const draftUrl = `https://zhuanlan.zhihu.com/p/${draftId}/edit`
 
+      // 正式发布（草稿模式跳过）
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch(
+            'https://zhuanlan.zhihu.com/api/articles/' + draftId + '/publish',
+            {
+              method: 'PUT',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-requested-with': 'fetch',
+              },
+            }
+          )
+          if (!publishResponse.ok) {
+            const errText = await publishResponse.text()
+            logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+            return this.createResult(true, {
+              postId: draftId,
+              postUrl: draftUrl,
+              draftOnly: true,
+              error: `发布失败: ${publishResponse.status} - ${errText}`,
+            })
+          }
+          const articleUrl = `https://zhuanlan.zhihu.com/p/${draftId}`
+          logger.debug('Publish success:', articleUrl)
+          return this.createResult(true, {
+            postId: draftId,
+            postUrl: articleUrl,
+            draftOnly: false,
+          })
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return this.createResult(true, {
+            postId: draftId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+          })
+        }
+      }
+
+      // 草稿模式
       return this.createResult(true, {
         postId: draftId,
         postUrl: draftUrl,

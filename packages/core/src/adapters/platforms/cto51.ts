@@ -9,6 +9,10 @@
  */
 import { CodeAdapter, ImageUploadResult } from '../code-adapter'
 import type { Article, AuthResult, SyncResult, PlatformMeta } from '../../types'
+import type { PublishOptions } from '../types'
+import { createLogger } from '../../lib/logger'
+
+const logger = createLogger('Cto51')
 
 interface UploadSignResponse {
   code: number
@@ -218,7 +222,7 @@ export class Cto51Adapter extends CodeAdapter {
   /**
    * 发布文章
    */
-  async publish(article: Article): Promise<SyncResult> {
+  async publish(article: Article, options?: PublishOptions): Promise<SyncResult> {
     const now = Date.now()
     return this.withHeaderRules(this.HEADER_RULES, async () => {
       // 确保已获取 csrf
@@ -279,12 +283,72 @@ export class Cto51Adapter extends CodeAdapter {
         throw new Error(res.msg || '发布失败')
       }
 
+      const postId = String(res.data.did)
+      const draftUrl = `https://blog.51cto.com/blogger/draft/${postId}`
+
+      // 正式发布（草稿模式跳过）
+      // TODO: 发布API需要实际测试验证
+      if (options?.draftOnly === false) {
+        try {
+          const publishResponse = await this.runtime.fetch('https://blog.51cto.com/blogger/publish', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: new URLSearchParams({
+              ...postData,
+              did: postId,
+              _csrf: this.csrf || '',
+            }),
+          })
+          if (publishResponse.ok) {
+            const articleUrl = `https://blog.51cto.com/blogger/publish/${postId}`
+            logger.debug('Publish success:', articleUrl)
+            return {
+              platform: this.meta.id,
+              success: true,
+              postId: postId,
+              postUrl: articleUrl,
+              draftOnly: false,
+              timestamp: now,
+            }
+          }
+          // 发布失败，返回草稿
+          const errText = await publishResponse.text()
+          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          return {
+            platform: this.meta.id,
+            success: true,
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${publishResponse.status} - ${errText}`,
+            timestamp: now,
+          }
+        } catch (e) {
+          // 发布异常，返回草稿 + 错误信息
+          logger.warn('Publish error, falling back to draft:', e)
+          return {
+            platform: this.meta.id,
+            success: true,
+            postId: postId,
+            postUrl: draftUrl,
+            draftOnly: true,
+            error: `发布失败: ${(e as Error).message}`,
+            timestamp: now,
+          }
+        }
+      }
+
+      // 草稿模式
       return {
         platform: this.meta.id,
         success: true,
-        postId: String(res.data.did),
-        postUrl: `https://blog.51cto.com/blogger/draft/${res.data.did}`,
-        draftOnly: true,
+        postId: postId,
+        postUrl: draftUrl,
+        draftOnly: options?.draftOnly ?? true,
         timestamp: now,
       }
     }).catch((error) => ({
