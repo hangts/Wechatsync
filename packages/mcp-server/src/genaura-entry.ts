@@ -298,6 +298,14 @@ async function buildDeps(): Promise<CallToolDeps> {
  * 所有运行时依赖通过动态 import() 加载，确保纯逻辑层在测试中不触发真实模块。
  */
 async function main(): Promise<void> {
+  // MCP 协议通过 stdout 传输 JSON-RPC 消息，适配器的 console.log 会污染通道。
+  // 将 console.log/info/debug 重定向到 stderr，console.warn/error 默认已到 stderr。
+  const origLog = console.log;
+  console.log = (...args: unknown[]) => process.stderr.write(args.map(String).join(" ") + "\n");
+  console.info = (...args: unknown[]) => process.stderr.write(args.map(String).join(" ") + "\n");
+  console.debug = (...args: unknown[]) => process.stderr.write(args.map(String).join(" ") + "\n");
+  void origLog;
+
   const { Server } = await import("@modelcontextprotocol/sdk/server/index.js");
   const { StdioServerTransport } = await import(
     "@modelcontextprotocol/sdk/server/stdio.js"
