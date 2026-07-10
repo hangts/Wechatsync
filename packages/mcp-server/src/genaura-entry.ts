@@ -55,6 +55,8 @@ interface GenAuraSyncResult {
   platformCode: string;
   success: boolean;
   draftUrl?: string;
+  /** true=仅保存了草稿，false=已正式发布 */
+  draftOnly?: boolean;
   error?: { code: string; message: string };
 }
 
@@ -169,6 +171,9 @@ export function toGenAuraSyncResult(sr: SyncResult): GenAuraSyncResult {
   };
   if (sr.success && sr.postUrl) {
     result.draftUrl = sr.postUrl;
+  }
+  if (sr.draftOnly !== undefined) {
+    result.draftOnly = sr.draftOnly;
   }
   if (sr.error) {
     result.error = {
