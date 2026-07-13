@@ -193,6 +193,7 @@ export function toGenAuraSyncResult(sr: SyncResult): GenAuraSyncResult {
 interface SyncArticleArgs {
   content: string;
   title: string;
+  tags?: string[];
   platforms: Array<{ code: string; cookies: SerializedCookie[] }>;
   options?: PublishOptions;
 }
@@ -243,7 +244,7 @@ export async function handleCallTool(
     }
 
     case "sync_article": {
-      const { content, title, platforms, options } = args as SyncArticleArgs;
+      const { content, title, tags, platforms, options } = args as SyncArticleArgs;
       const draftOnly = options?.draftOnly ?? true;
 
       const results = await Promise.all(
@@ -261,7 +262,7 @@ export async function handleCallTool(
           }
           deps.setCookieContext(adapter.meta.homepage, cookies);
           try {
-            const article: Article = { title, markdown: content, html: deps.markdownToHtml(content) };
+            const article: Article = { title, markdown: content, html: deps.markdownToHtml(content), tags };
             const sr = await adapter.publish(article, { draftOnly });
             if (!sr.success) {
               process.stderr.write(`[genaura-entry] sync_article 平台 ${code} 适配器返回失败: ${sr.error ?? "(无错误信息)"}\n`);

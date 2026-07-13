@@ -20,7 +20,7 @@ export class CSDNAdapter extends CodeAdapter {
     name: 'CSDN',
     icon: 'https://g.csdnimg.cn/static/logo/favicon32.ico',
     homepage: 'https://editor.csdn.net/md/',
-    capabilities: ['article', 'draft', 'image_upload'],
+    capabilities: ['article', 'draft', 'image_upload', 'tags'],
   }
 
   /** 预处理配置: CSDN 使用 Markdown 格式 */
@@ -224,7 +224,7 @@ export class CSDNAdapter extends CodeAdapter {
             content: htmlContent,
             readType: 'public',
             level: 0,
-            tags: '',
+            tags: article.tags && article.tags.length > 0 ? article.tags.join(',') : '其他',
             status: options?.draftOnly === false ? 0 : 2, // 0=发布, 2=草稿
             categories: '',
             type: 'original',
