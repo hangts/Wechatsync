@@ -143,24 +143,24 @@ export class BaijiahaoAdapter extends CodeAdapter {
       const res = JSON.parse(jsonStr) as {
         errno: number
         errmsg: string
-        ret?: { article_id: string }
+        ret?: { article_id: string; nid: string; url: string }
       }
 
       logger.debug('Save response:', res)
 
-      if (res.errmsg !== 'success' || !res.ret?.article_id) {
+      if (res.errno !== 0 || !res.ret?.article_id) {
         throw new Error(res.errmsg || '保存草稿失败')
       }
 
       const postId = res.ret.article_id
-      const draftUrl = `https://baijiahao.baidu.com/builder/rc/edit?type=news&article_id=${postId}`
+      const draftUrl = res.ret.url
 
       // 正式发布（草稿模式跳过）
-      // TODO: 发布API需要实际测试验证
       if (options?.draftOnly === false) {
+        logger.debug('正在发布')
         try {
           const publishResponse = await this.runtime.fetch(
-            'https://baijiahao.baidu.com/pcui/article/publish',
+            'https://baijiahao.baidu.com/pcui/article/publish?type=news&callback=bjhpublish',
             {
               method: 'POST',
               credentials: 'include',
@@ -171,26 +171,67 @@ export class BaijiahaoAdapter extends CodeAdapter {
               body: new URLSearchParams({
                 article_id: postId,
                 type: 'news',
+                title: article.title,
+                content: content,
+                len: String(content.length),
+                feed_cat: '1',
+                activity_list: JSON.stringify([{ id: 408, is_checked: 0 }]),
+                source_reprinted_allow: '0',
+                original_status: '0',
+                original_handler_status: '1',
+                isBeautify: 'false',
+                subtitle: '',
+                bjhtopic_id: '',
+                bjhtopic_info: '',
               }),
             }
           )
-          if (publishResponse.ok) {
-            const articleUrl = `https://baijiahao.baidu.com/s?id=${postId}`
-            logger.debug('Publish success:', articleUrl)
+
+          const publishText = await publishResponse.text()
+          logger.debug('Publish response:', {
+            ok: publishResponse.ok,
+            status: publishResponse.status,
+            statusText: publishResponse.statusText,
+            headers: Object.fromEntries(publishResponse.headers.entries()),
+            body: publishText,
+          })
+
+          // 清洗 JSONP 包装 bjhpublish(...)
+          const publishJsonStr = publishText.replace(/^bjhpublish\(/, '').replace(/\)$/, '')
+          let publishErrno: number | null = null
+          let publishErrmsg: string | null = null
+          let publishRet: { article_id?: string; nid?: string; url?: string } | null = null
+          try {
+            const publishJson = JSON.parse(publishJsonStr) as {
+              errno: number
+              errmsg: string
+              ret?: { article_id: string; nid: string; url: string }
+            }
+            publishErrno = publishJson.errno
+            publishErrmsg = publishJson.errmsg
+            publishRet = publishJson.ret ?? null
+          } catch {
+            // 非 JSON 响应，忽略
+          }
+
+          if (publishResponse.ok && publishErrno === 0) {
+            const publishId = publishRet?.article_id || postId
+            const articleUrl = `https://baijiahao.baidu.com/s?id=${publishId}`
+            logger.debug('Publish success')
             return this.createResult(true, {
-              postId: postId,
+              postId: publishId,
               postUrl: articleUrl,
               draftOnly: false,
             })
           }
-          // 发布失败，返回草稿
-          const errText = await publishResponse.text()
-          logger.warn('Publish failed, falling back to draft:', publishResponse.status, errText)
+          // 发布失败（HTTP 错误或业务错误），返回草稿
+          const errorMsg = publishErrmsg || `HTTP ${publishResponse.status}`
+          logger.warn('Publish failed, falling back to draft:', errorMsg)
           return this.createResult(true, {
             postId: postId,
             postUrl: draftUrl,
             draftOnly: true,
-            error: `发布失败: ${publishResponse.status} - ${errText}`,
+            error: `发布失败: ${errorMsg}`,
           })
         } catch (e) {
           // 发布异常，返回草稿 + 错误信息
