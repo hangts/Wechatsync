@@ -54,9 +54,9 @@ interface GenAuraAuthResult {
 interface GenAuraSyncResult {
   platformCode: string;
   success: boolean;
-  draftUrl?: string;
-  /** true=仅保存了草稿，false=已正式发布 */
-  draftOnly?: boolean;
+  publishUrl?: string;
+  /** 产出类型：draft=草稿, published=已发布 */
+  type?: "draft" | "published";
   error?: { code: string; message: string };
 }
 
@@ -171,10 +171,11 @@ export function toGenAuraSyncResult(sr: SyncResult): GenAuraSyncResult {
     success: sr.success,
   };
   if (sr.success && sr.postUrl) {
-    result.draftUrl = sr.postUrl;
+    result.publishUrl = sr.postUrl;
   }
+  // 根据 draftOnly 推断 type：draftOnly=true → "draft", false → "published", 未设置则不传
   if (sr.draftOnly !== undefined) {
-    result.draftOnly = sr.draftOnly;
+    result.type = sr.draftOnly ? "draft" : "published";
   }
   if (sr.error) {
     result.error = {
@@ -244,8 +245,11 @@ export async function handleCallTool(
     }
 
     case "sync_article": {
-      const { content, title, tags, platforms, options } = args as SyncArticleArgs;
-      const draftOnly = options?.draftOnly ?? true;
+      const { content, title, tags, platforms } = args as SyncArticleArgs;
+      const rawOptions = (args as Record<string, unknown>).options as Record<string, unknown> | undefined;
+      // publishDirectly=true → draftOnly=false（正式发布）；否则 draftOnly=true（保存为草稿）
+      const publishDirectly = rawOptions?.publishDirectly === true;
+      const draftOnly = !publishDirectly;
 
       const results = await Promise.all(
         platforms.map(async ({ code, cookies }) => {
@@ -332,6 +336,10 @@ async function buildDeps(): Promise<CallToolDeps> {
     SohuAdapter, WoshipmAdapter, EastmoneyAdapter,
   ];
 
+  // const AdapterClasses = [
+  //   BaijiahaoAdapter,
+  // ];
+
   for (const AdapterClass of AdapterClasses) {
     const instance = new AdapterClass();
     adapterRegistry.register({
@@ -404,7 +412,7 @@ async function main(): Promise<void> {
       },
       {
         name: "sync_article",
-        description: "将文章投放到一个或多个平台（保存为草稿）",
+        description: "将文章投放到一个或多个平台（正式发布或保存为草稿，由 options.publishDirectly 控制）",
         inputSchema: {
           type: "object",
           properties: {

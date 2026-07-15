@@ -158,6 +158,7 @@ export class BaijiahaoAdapter extends CodeAdapter {
       // 正式发布（草稿模式跳过）
       if (options?.draftOnly === false) {
         logger.debug('正在发布')
+        
         try {
           const publishResponse = await this.runtime.fetch(
             'https://baijiahao.baidu.com/pcui/article/publish?type=news&callback=bjhpublish',
