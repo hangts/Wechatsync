@@ -328,8 +328,9 @@ async function buildDeps(): Promise<CallToolDeps> {
 
   // 适配器构造函数无参，meta 为类实例属性；registry 在 get() 中调用 init(runtime) 注入运行时
   const AdapterClasses = [
+    BaijiahaoAdapter,
     JuejinAdapter, ZhihuAdapter, CSDNAdapter,
-    WeiboAdapter, BilibiliAdapter, BaijiahaoAdapter,
+    WeiboAdapter, BilibiliAdapter, 
     YuqueAdapter, WeixinAdapter, Cto51Adapter,
     ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
     CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
