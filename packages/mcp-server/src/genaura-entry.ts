@@ -41,6 +41,8 @@ interface GenAuraPlatformMeta {
   loginUrl: string;
   icon?: string;
   supported: boolean;
+  /** 用于 Cookie 域名匹配的根域名（如 juejin.cn、zhihu.com、qq.com） */
+  host: string;
 }
 
 /** GenAura 登录态检测结果 */
@@ -103,10 +105,26 @@ export interface CallToolDeps {
 // ============================================================================
 
 /**
+ * 从 loginUrl 中提取根域名用于 Cookie 匹配。
+ * 取 hostname 最后两段（如 juejin.cn、zhihu.com、qq.com），
+ * 适用于所有发布平台（.cn / .com / .net），无需 psl 库。
+ */
+function extractDomain(loginUrl: string): string {
+  try {
+    const hostname = new URL(loginUrl).hostname;
+    const parts = hostname.split(".");
+    return parts.slice(-2).join(".");
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Wechatsync PlatformMeta → GenAura PlatformMeta。
  * - id → code
  * - homepage → loginUrl
  * - capabilities 含 'article' → supported=true
+ * - 从 homepage 提取 host（用于 Cookie 域名匹配）
  */
 export function toGenAuraPlatformMeta(meta: PlatformMeta): GenAuraPlatformMeta {
   return {
@@ -115,6 +133,7 @@ export function toGenAuraPlatformMeta(meta: PlatformMeta): GenAuraPlatformMeta {
     loginUrl: meta.homepage,
     icon: meta.icon,
     supported: meta.capabilities.includes("article"),
+    host: extractDomain(meta.homepage),
   };
 }
 
