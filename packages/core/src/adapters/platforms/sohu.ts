@@ -224,8 +224,7 @@ export class SohuAdapter extends CodeAdapter {
       const postId = res.data
       const draftUrl = `https://mp.sohu.com/mpfe/v4/contentManagement/news/addarticle?spm=smmp.articlelist.0.0&contentStatus=2&id=${postId}`
 
-      // 正式发布（草稿模式跳过）
-      // TODO: 发布API需要实际测试验证
+      // 正式发布
       if (options?.draftOnly === false) {
         try {
           const publishResponse = await this.runtime.fetch(
@@ -240,20 +239,41 @@ export class SohuAdapter extends CodeAdapter {
                 'sp-cm': this.spCm,
               },
               body: JSON.stringify({
+                title: article.title,
+                brief: '',
+                content: content,
+                channelId: 24,
+                categoryId: -1,
                 id: Number(postId),
+                userColumnId: null,
+                columnNewsIds: [],
+                businessCode: 0,
+                declareOriginal: false,
+                cover: null,
+                topicIds: [],
+                isAd: 0,
+                userLabels: '[]',
+                reprint: false,
+                customTags: '',
+                infoResource: 0,
+                sourceUrl: null,
+                visibleToLoginedUsers: 0,
+                attrIds: [],
                 accountId: Number(this.accountInfo!.id),
               }),
             }
           )
           if (publishResponse.ok) {
-            const publishRes = await publishResponse.json() as { success?: boolean; msg?: string }
+            const publishRes = await publishResponse.json() as { data?: number; success?: boolean; msg?: string }
             if (publishRes.success) {
-              const articleUrl = `https://www.sohu.com/a/${postId}`
+              const accountId = Number(this.accountInfo!.id)
+              const articleUrl = `https://www.sohu.com/a/${postId}_${accountId}`
+              const previewUrl = `https://mp.sohu.com/mpfe/v4/contentManagement/news/articlepreview?id=${postId}&accountId=${accountId}`
               logger.debug('Publish success:', articleUrl)
               return this.createResult(true, {
                 postId: String(postId),
                 postUrl: articleUrl,
-                previewUrl: articleUrl,   // 默认等于正式发布 URL（实际预览规则需调研）
+                previewUrl: previewUrl,
                 draftOnly: false,
               })
             }
