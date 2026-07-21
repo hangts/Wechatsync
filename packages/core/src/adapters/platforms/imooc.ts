@@ -163,6 +163,7 @@ export class ImoocAdapter extends CodeAdapter {
               success: true,
               postId: postId,
               postUrl: articleUrl,
+              previewUrl: articleUrl,
               draftOnly: false,
               timestamp: now,
             }
@@ -175,6 +176,7 @@ export class ImoocAdapter extends CodeAdapter {
             success: true,
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${publishResponse.status} - ${errText}`,
             timestamp: now,
@@ -187,6 +189,7 @@ export class ImoocAdapter extends CodeAdapter {
             success: true,
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
             timestamp: now,
@@ -200,6 +203,7 @@ export class ImoocAdapter extends CodeAdapter {
         success: true,
         postId: postId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
         timestamp: now,
       }

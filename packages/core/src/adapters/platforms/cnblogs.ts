@@ -241,6 +241,7 @@ export class CnblogsAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId,
         postUrl: isPublish ? articleUrl : draftUrl,
+        previewUrl: isPublish ? articleUrl : draftUrl,
         draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {

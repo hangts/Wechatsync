@@ -222,6 +222,7 @@ export class WeiboAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: postId,
         postUrl: isPublish ? articleUrl : draftUrl,
+        previewUrl: isPublish ? articleUrl : draftUrl,
         draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {

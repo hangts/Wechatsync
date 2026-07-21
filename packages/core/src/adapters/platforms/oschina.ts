@@ -203,6 +203,7 @@ export class OschinaAdapter extends CodeAdapter {
               success: true,
               postId: draftId,
               postUrl: articleUrl,
+              previewUrl: articleUrl,
               draftOnly: false,
               timestamp: now,
             }
@@ -215,6 +216,7 @@ export class OschinaAdapter extends CodeAdapter {
             success: true,
             postId: draftId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${publishResponse.status} - ${errText}`,
             timestamp: now,
@@ -227,6 +229,7 @@ export class OschinaAdapter extends CodeAdapter {
             success: true,
             postId: draftId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
             timestamp: now,
@@ -240,6 +243,7 @@ export class OschinaAdapter extends CodeAdapter {
         success: true,
         postId: draftId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
         timestamp: now,
       }

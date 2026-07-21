@@ -294,6 +294,7 @@ export class WeixinAdapter extends CodeAdapter {
               return this.createResult(true, {
                 postId: postId,
                 postUrl: draftUrl,
+                previewUrl: draftUrl,
                 draftOnly: false,
               })
             }
@@ -303,6 +304,7 @@ export class WeixinAdapter extends CodeAdapter {
             return this.createResult(true, {
               postId: postId,
               postUrl: draftUrl,
+              previewUrl: draftUrl,
               draftOnly: true,
               error: `发布失败: ${errMsg}`,
             })
@@ -313,6 +315,7 @@ export class WeixinAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${publishResponse.status} - ${errText}`,
           })
@@ -322,6 +325,7 @@ export class WeixinAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
           })
@@ -332,6 +336,7 @@ export class WeixinAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: postId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
       })
     }).catch((error) => this.createResult(false, {

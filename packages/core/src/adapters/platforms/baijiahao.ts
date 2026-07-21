@@ -222,6 +222,7 @@ export class BaijiahaoAdapter extends CodeAdapter {
             return this.createResult(true, {
               postId: publishId,
               postUrl: articleUrl,
+              previewUrl: articleUrl,   // 默认等于正式发布 URL（实际预览规则需调研）
               draftOnly: false,
             })
           }
@@ -231,6 +232,7 @@ export class BaijiahaoAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,       // 草稿场景预览 URL = 草稿 URL
             draftOnly: true,
             error: `发布失败: ${errorMsg}`,
           })
@@ -240,6 +242,7 @@ export class BaijiahaoAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,       // 草稿场景预览 URL = 草稿 URL
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
           })
@@ -250,6 +253,7 @@ export class BaijiahaoAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: postId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,   // 草稿场景预览 URL = 草稿 URL
         draftOnly: options?.draftOnly ?? true,
       })
     }).catch((error) => this.createResult(false, {

@@ -257,6 +257,7 @@ export class SegmentfaultAdapter extends CodeAdapter {
               success: true,
               postId: String(postId),
               postUrl: articleUrl,
+              previewUrl: articleUrl,
               draftOnly: false,
               timestamp: now,
             }
@@ -269,6 +270,7 @@ export class SegmentfaultAdapter extends CodeAdapter {
             success: true,
             postId: String(postId),
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${publishResponse.status} - ${errText}`,
             timestamp: now,
@@ -281,6 +283,7 @@ export class SegmentfaultAdapter extends CodeAdapter {
             success: true,
             postId: String(postId),
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
             timestamp: now,
@@ -294,6 +297,7 @@ export class SegmentfaultAdapter extends CodeAdapter {
         success: true,
         postId: String(postId),
         postUrl: draftUrl,
+        previewUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
         timestamp: now,
       }

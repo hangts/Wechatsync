@@ -161,6 +161,7 @@ export class BilibiliAdapter extends CodeAdapter {
             return this.createResult(true, {
               postId: postId,
               postUrl: articleUrl,
+              previewUrl: articleUrl,
               draftOnly: false,
             })
           }
@@ -170,6 +171,7 @@ export class BilibiliAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${publishResponse.status} - ${errText}`,
           })
@@ -179,6 +181,7 @@ export class BilibiliAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: postId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
           })
@@ -189,6 +192,7 @@ export class BilibiliAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: postId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
       })
     }).catch((error) => this.createResult(false, {

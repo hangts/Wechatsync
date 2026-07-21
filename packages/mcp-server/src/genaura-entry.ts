@@ -57,6 +57,8 @@ interface GenAuraSyncResult {
   platformCode: string;
   success: boolean;
   publishUrl?: string;
+  previewUrl?: string;              // 新增：预览 URL
+  platformArticleId?: string;       // 新增：平台文章 ID
   /** 产出类型：draft=草稿, published=已发布 */
   type?: "draft" | "published";
   error?: { code: string; message: string };
@@ -191,6 +193,12 @@ export function toGenAuraSyncResult(sr: SyncResult): GenAuraSyncResult {
   };
   if (sr.success && sr.postUrl) {
     result.publishUrl = sr.postUrl;
+  }
+  if (sr.success && sr.previewUrl) {
+    result.previewUrl = sr.previewUrl;       // 映射预览 URL
+  }
+  if (sr.success && sr.postId) {
+    result.platformArticleId = sr.postId;    // 映射文章 ID
   }
   // 根据 draftOnly 推断 type：draftOnly=true → "draft", false → "published", 未设置则不传
   if (sr.draftOnly !== undefined) {

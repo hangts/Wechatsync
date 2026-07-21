@@ -198,6 +198,7 @@ export class ZhihuAdapter extends CodeAdapter {
             return this.createResult(true, {
               postId: draftId,
               postUrl: draftUrl,
+              previewUrl: draftUrl,
               draftOnly: true,
               error: `发布失败: ${publishResponse.status} - ${errText}`,
             })
@@ -207,6 +208,7 @@ export class ZhihuAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: draftId,
             postUrl: articleUrl,
+            previewUrl: articleUrl,
             draftOnly: false,
           })
         } catch (e) {
@@ -215,6 +217,7 @@ export class ZhihuAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: draftId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
           })
@@ -225,6 +228,7 @@ export class ZhihuAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: draftId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,
         draftOnly: options?.draftOnly ?? true,
       })
     }).catch((error) => this.createResult(false, {

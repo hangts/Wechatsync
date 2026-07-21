@@ -27,6 +27,7 @@ export interface SyncResult {
   success: boolean
   postId?: string
   postUrl?: string
+  previewUrl?: string   // 文章预览 URL（审核期间可用，不等同于草稿 URL）
   draftOnly?: boolean  // 是否只保存了草稿
   error?: string
   message?: string  // 额外提示信息

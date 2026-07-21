@@ -172,6 +172,7 @@ export class WoshipmAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: draftId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,
         draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {

@@ -150,7 +150,7 @@ export class CSDNAdapter extends CodeAdapter {
 
   /**
    * 生成 CSDN API 签名
-   * 签名格式: METHOD\nAccept\nContent-MD5\nContent-Type\n\nHeaders\nPath
+   * 签名格式: METHOD + Accept + Content-MD5 + Content-Type + Headers + Path
    */
   private async signRequest(apiPath: string, method: 'GET' | 'POST' = 'POST'): Promise<Record<string, string>> {
     const nonce = this.createUuid()
@@ -264,6 +264,7 @@ export class CSDNAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: postId,
         postUrl: isPublish ? articleUrl : draftUrl,
+        previewUrl: isPublish ? articleUrl : draftUrl,
         draftOnly: isPublish ? false : true,
       })
     }).catch((error) => this.createResult(false, {

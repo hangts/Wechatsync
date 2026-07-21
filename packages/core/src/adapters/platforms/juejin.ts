@@ -306,6 +306,7 @@ export class JuejinAdapter extends CodeAdapter {
             return this.createResult(true, {
               postId: draftId,
               postUrl: draftUrl,
+              previewUrl: draftUrl,     // 草稿场景预览 URL = 草稿 URL
               draftOnly: true,
               error: publishData.err_msg || `发布失败: 错误码 ${publishData.err_no}`,
             })
@@ -316,6 +317,7 @@ export class JuejinAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: publishData.data?.job_id ?? draftId,
             postUrl: articleUrl,
+            previewUrl: articleUrl,   // 掘金无独立预览链接，预览 URL = 正式 URL
             draftOnly: false,
           })
         } catch (e) {
@@ -324,6 +326,7 @@ export class JuejinAdapter extends CodeAdapter {
           return this.createResult(true, {
             postId: draftId,
             postUrl: draftUrl,
+            previewUrl: draftUrl,     // 草稿场景预览 URL = 草稿 URL
             draftOnly: true,
             error: `发布失败: ${(e as Error).message}`,
           })
@@ -334,6 +337,7 @@ export class JuejinAdapter extends CodeAdapter {
       return this.createResult(true, {
         postId: draftId,
         postUrl: draftUrl,
+        previewUrl: draftUrl,   // 草稿场景预览 URL = 草稿 URL
         draftOnly: options?.draftOnly ?? true,
       })
     }).catch((error) => this.createResult(false, {
