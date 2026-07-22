@@ -276,11 +276,64 @@ export class JuejinAdapter extends CodeAdapter {
 
       const draftUrl = `https://juejin.cn/editor/drafts/${draftId}`
 
+      // 7. 更新草稿（设置分类、标签、摘要等，参考 fabu.json 中的 article_draft/update 调用）
+      // 分类/标签默认值来自 fabu.json log 中的实际发布请求值
+      const briefContent = article.summary || article.markdown?.replace(/^#+\s+/gm, '').replace(/\*\*/g, '').replace(/\n/g, ' ').substring(0, 80).trim() || ''
+      const updateBody: Record<string, unknown> = {
+        id: draftId,
+        category_id: article.category || '6809637772874219534',
+        tag_ids: article.tags && article.tags.length > 0 ? article.tags : ['6809640621406421006'],
+        link_url: '',
+        cover_image: article.cover || '',
+        is_gfw: 0,
+        title: article.title,
+        brief_content: briefContent,
+        is_english: 0,
+        is_original: 1,
+        edit_type: 10,
+        html_content: 'deprecated',
+        mark_content: markdown,
+        theme_ids: [],
+        pics: [],
+      }
+
+      const updateResponse = await this.runtime.fetch(
+        `https://api.juejin.cn/content_api/v1/article_draft/update?aid=${IMAGEX_AID}&uuid=${this.uuid}`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-secsdk-csrf-token': csrfToken,
+          },
+          body: JSON.stringify(updateBody),
+        }
+      )
+
+      const updateText = await updateResponse.text()
+      logger.debug('Update draft response:', updateResponse.status, updateText.substring(0, 300))
+
+      if (!updateResponse.ok) {
+        throw new Error(`更新草稿失败: ${updateResponse.status} - ${updateText}`)
+      }
+
+      // 不需要解析 update 响应，成功后继续
+
       // 正式发布（草稿模式跳过）
       if (options?.draftOnly === false) {
         try {
+          // 计算原始字数（用于发布请求）
+          const originWordCount = markdown.length
+          const body = {
+                draft_id: draftId,
+                sync_to_org: false,
+                column_ids: [],
+                theme_ids: [],
+                encrypted_word_count: (originWordCount ^ 538942) + 538942,
+                origin_word_count: originWordCount,
+              }
           const publishResponse = await this.runtime.fetch(
-            'https://api.juejin.cn/content_api/v1/article/publish',
+            `https://api.juejin.cn/content_api/v1/article/publish?aid=${IMAGEX_AID}&uuid=${this.uuid}`,
             {
               method: 'POST',
               credentials: 'include',
@@ -288,18 +341,13 @@ export class JuejinAdapter extends CodeAdapter {
                 'Content-Type': 'application/json',
                 'x-secsdk-csrf-token': csrfToken,
               },
-              body: JSON.stringify({
-                draft_id: draftId,
-                sync_to_org: false,
-                column_ids: [],
-                theme_ids: [],
-              }),
+              body: JSON.stringify(body),
             }
           )
           const publishText = await publishResponse.text()
           logger.debug('Publish response:', publishResponse.status, publishText.substring(0, 200))
 
-          const publishData = JSON.parse(publishText) as { err_no?: number; err_msg?: string; data?: { job_id: string } }
+          const publishData = JSON.parse(publishText) as { err_no?: number; err_msg?: string; data?: { article_id: string } }
 
           if (publishData.err_no && publishData.err_no !== 0) {
             // 发布失败，返回草稿 + 错误信息
@@ -313,12 +361,19 @@ export class JuejinAdapter extends CodeAdapter {
             })
           }
 
-          const articleUrl = `https://juejin.cn/post/${publishData.data?.job_id}`
+          const articleId = publishData.data?.article_id
+          if (!articleId) {
+            throw new Error('发布成功但未获取到 article_id')
+          }
+
+
+          const previewUrl = `https://juejin.cn/spost/${articleId}`
+          const articleUrl = `https://juejin.cn/post/${articleId}`
           logger.debug('Publish success:', articleUrl)
           return this.createResult(true, {
-            postId: publishData.data?.job_id ?? draftId,
+            postId: articleId,
             postUrl: articleUrl,
-            previewUrl: articleUrl,   // 掘金无独立预览链接，预览 URL = 正式 URL
+            previewUrl: previewUrl, 
             draftOnly: false,
           })
         } catch (e) {

@@ -49,6 +49,7 @@ export class Cto51Adapter extends CodeAdapter {
     icon: 'https://blog.51cto.com/favicon.ico',
     homepage: 'https://blog.51cto.com/blogger/publish',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 51CTO 使用 Markdown 格式 */

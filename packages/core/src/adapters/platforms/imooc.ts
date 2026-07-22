@@ -15,6 +15,7 @@ export class ImoocAdapter extends CodeAdapter {
     icon: 'https://www.imooc.com/favicon.ico',
     homepage: 'https://www.imooc.com/article',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 慕课网使用 Markdown 格式 */

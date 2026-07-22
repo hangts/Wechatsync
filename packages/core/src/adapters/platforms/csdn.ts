@@ -21,7 +21,7 @@ export class CSDNAdapter extends CodeAdapter {
     icon: 'https://g.csdnimg.cn/static/logo/favicon32.ico',
     homepage: 'https://editor.csdn.net/md/',
     capabilities: ['article', 'draft', 'image_upload', 'tags'],
-    needsReview: true,
+    needsReview: false,
   }
 
   /** 预处理配置: CSDN 使用 Markdown 格式 */
@@ -193,10 +193,8 @@ export class CSDNAdapter extends CodeAdapter {
         }
       }
 
-      // Use pre-processed markdown content directly
+      // 2. 处理图片
       let markdown = article.markdown || ''
-
-      // Process images in markdown
       markdown = await this.processImages(
         markdown,
         (src) => this.uploadImageByUrl(src),
@@ -206,19 +204,20 @@ export class CSDNAdapter extends CodeAdapter {
         }
       )
 
-      // Get HTML content (CSDN API needs both markdown and HTML)
       const htmlContent = article.html || ''
+      const isPublish = options?.draftOnly === false
 
-      // Generate signature and save article
-      const apiPath = '/blog-console-api/v3/mdeditor/saveArticle'
-      const headers = await this.signRequest(apiPath)
+      // Step 1: 保存草稿 → 获取 article_id
+      const draftApiPath = '/blog-console-api/v3/mdeditor/saveArticle'
+      const draftHeaders = await this.signRequest(draftApiPath)
 
-      const response = await this.runtime.fetch(
-        `https://bizapi.csdn.net${apiPath}`,
+      logger.debug('Saving draft...')
+      const draftResponse = await this.runtime.fetch(
+        `https://bizapi.csdn.net${draftApiPath}`,
         {
           method: 'POST',
           credentials: 'include',
-          headers,
+          headers: draftHeaders,
           body: JSON.stringify({
             title: article.title,
             markdowncontent: markdown,
@@ -226,7 +225,7 @@ export class CSDNAdapter extends CodeAdapter {
             readType: 'public',
             level: 0,
             tags: article.tags && article.tags.length > 0 ? article.tags.join(',') : '其他',
-            status: options?.draftOnly === false ? 0 : 2, // 0=发布, 2=草稿
+            status: 2, // 始终先保存为草稿
             categories: '',
             type: 'original',
             original_link: '',
@@ -238,39 +237,127 @@ export class CSDNAdapter extends CodeAdapter {
             is_new: 1,
             vote_id: 0,
             resource_id: '',
-            pubStatus: options?.draftOnly === false ? 'publish' : 'draft',
+            pubStatus: 'draft',
             creator_activity_id: '',
           }),
         }
       )
 
-      const res = await response.json() as {
+      const draftRes = await draftResponse.json() as {
         code: number
         message?: string
         msg?: string
         data?: { id: string }
       }
 
-      logger.debug('Save response:', res)
+      logger.debug('Save draft response:', draftRes)
 
-      if (res.code !== 200 || !res.data?.id) {
-        throw new Error(res.msg || res.message || '保存草稿失败')
+      if (draftRes.code !== 200 || !draftRes.data?.id) {
+        throw new Error(draftRes.msg || draftRes.message || '保存草稿失败')
       }
 
-      const postId = res.data.id
-      const isPublish = options?.draftOnly === false
-      const draftUrl = `https://editor.csdn.net/md?articleId=${postId}`
-      const articleUrl = `https://blog.csdn.net/article/details/${postId}`
+      const postId = draftRes.data.id
+
+      // 如果只保存草稿，直接返回
+      if (!isPublish) {
+        const draftUrl = `https://editor.csdn.net/md?articleId=${postId}`
+        return this.createResult(true, {
+          postId,
+          postUrl: draftUrl,
+          previewUrl: draftUrl,
+          draftOnly: true,
+        })
+      }
+
+      // Step 2: 通过 postedit API 发布
+      const publishApiPath = '/blog-console-api/v1/postedit/saveArticle'
+      const publishHeaders = await this.signRequest(publishApiPath)
+      const description = this.extractDescription(markdown || htmlContent)
+
+      logger.debug('Publishing article...')
+      const publishResponse = await this.runtime.fetch(
+        `https://bizapi.csdn.net${publishApiPath}`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: publishHeaders,
+          body: JSON.stringify({
+            article_id: postId,
+            title: article.title,
+            description,
+            content: htmlContent,
+            tags: article.tags && article.tags.length > 0 ? article.tags.join(',') : '其他',
+            categories: '',
+            type: 'original',
+            status: 0,
+            read_type: 'public',
+            creation_statement: 0,
+            reason: '',
+            original_link: '',
+            authorized_status: false,
+            check_original: false,
+            source: 'pc_postedit',
+            not_auto_saved: 1,
+            creator_activity_id: '',
+            cover_images: [],
+            cover_type: 1,
+            vote_id: 0,
+            resource_id: '',
+            scheduled_time: 0,
+            markdowncontent: markdown,
+            resource_url: '',
+            editor_type: 0,
+            plan: [],
+            level: '0',
+            strategy: null,
+            is_new: 0,
+            sync_git_code: 0,
+          }),
+        }
+      )
+
+      const publishRes = await publishResponse.json() as {
+        code: number
+        message?: string
+        msg?: string
+        data?: {
+          url: string
+          article_id: number
+          title: string
+          description: string
+        }
+      }
+
+      logger.debug('Publish response:', publishRes)
+
+      if (publishRes.code !== 200 || !publishRes.data?.url) {
+        throw new Error(publishRes.msg || publishRes.message || '发布失败')
+      }
 
       return this.createResult(true, {
-        postId: postId,
-        postUrl: isPublish ? articleUrl : draftUrl,
-        previewUrl: isPublish ? articleUrl : draftUrl,
-        draftOnly: isPublish ? false : true,
+        postId,
+        postUrl: publishRes.data.url,
+        previewUrl: publishRes.data.url,
+        draftOnly: false,
       })
     }).catch((error) => this.createResult(false, {
       error: (error as Error).message,
     }))
+  }
+
+  /**
+   * 从内容中提取摘要（去掉 Markdown 格式，取前 ~100 字符）
+   */
+  private extractDescription(content: string): string {
+    const cleaned = content
+      .replace(/!\[.*?\]\(.*?\)/g, '') // 移除图片
+      .replace(/\[([^\]]*)\]\(.*?\)/g, '$1') // 移除链接，保留文字
+      .replace(/#{1,6}\s/g, '') // 移除标题标记
+      .replace(/[*_~`]/g, '') // 移除格式符号
+      .replace(/\n+/g, ' ') // 换行转空格
+      .trim()
+
+    return cleaned.length > 100 ? cleaned.substring(0, 100) + '...' : cleaned
   }
 
   /**

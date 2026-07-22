@@ -354,17 +354,17 @@ async function buildDeps(): Promise<CallToolDeps> {
     ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
     CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
     SohuAdapter, WoshipmAdapter, EastmoneyAdapter,
+    ToutiaoAdapter,
   } = await import("@wechatsync/core");
 
   // 适配器构造函数无参，meta 为类实例属性；registry 在 get() 中调用 init(runtime) 注入运行时
   const AdapterClasses = [
-    BaijiahaoAdapter,SohuAdapter,
-    JuejinAdapter, ZhihuAdapter, CSDNAdapter,
+    BaijiahaoAdapter,SohuAdapter,CSDNAdapter,JuejinAdapter,ToutiaoAdapter,ZhihuAdapter, 
     WeiboAdapter, BilibiliAdapter, 
     YuqueAdapter, WeixinAdapter, Cto51Adapter,
     ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
     CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
-    WoshipmAdapter, EastmoneyAdapter,
+    WoshipmAdapter, EastmoneyAdapter
   ];
 
   // const AdapterClasses = [

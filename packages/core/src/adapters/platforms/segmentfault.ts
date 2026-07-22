@@ -14,7 +14,8 @@ export class SegmentfaultAdapter extends CodeAdapter {
     name: '思否',
     icon: 'https://imgcache.iyiou.com/Company/2016-05-11/cf-segmentfault.jpg',
     homepage: 'https://segmentfault.com/user/draft',
-    capabilities: ['article', 'draft', 'image_upload'],
+    capabilities: ['article', 'draft', 'image_upload'], 
+    needsReview: true,
   }
 
   /** 预处理配置: 思否使用 Markdown 格式 */
