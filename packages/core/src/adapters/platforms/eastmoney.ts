@@ -42,6 +42,7 @@ export class EastmoneyAdapter extends CodeAdapter {
     icon: "https://mp.eastmoney.com/collect/pc_article/favicon.ico",
     homepage: "https://mp.eastmoney.com",
     capabilities: ["article", "draft", "image_upload", "cover"],
+    needsReview: true,
   };
 
   /** 预处理配置 */

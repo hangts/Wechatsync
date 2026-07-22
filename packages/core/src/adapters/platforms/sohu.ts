@@ -33,6 +33,7 @@ export class SohuAdapter extends CodeAdapter {
     icon: 'https://mp.sohu.com/favicon.ico',
     homepage: 'https://mp.sohu.com/mpfe/v3/main/first/page?newsType=1',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 搜狐号使用 HTML 格式 */

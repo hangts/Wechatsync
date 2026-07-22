@@ -22,6 +22,7 @@ export class WeiboAdapter extends CodeAdapter {
     icon: 'https://weibo.com/favicon.ico',
     homepage: 'https://card.weibo.com/article/v5/editor',
     capabilities: ['article', 'draft', 'image_upload', 'cover'],
+    needsReview: true,
   }
 
   /** 预处理配置: 微博使用 HTML 格式 */

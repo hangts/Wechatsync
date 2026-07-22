@@ -15,6 +15,7 @@ export class WoshipmAdapter extends CodeAdapter {
     icon: 'https://www.woshipm.com/favicon.ico',
     homepage: 'https://www.woshipm.com',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 人人都是产品经理使用 HTML 格式 */

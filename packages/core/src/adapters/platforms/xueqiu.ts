@@ -23,6 +23,7 @@ export class XueqiuAdapter extends CodeAdapter {
     icon: 'https://xqdoc.imedao.com/17aebcfb84a145d33fc18679.ico',
     homepage: 'https://mp.xueqiu.com/writeV2',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 雪球使用 Markdown 格式 */

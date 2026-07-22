@@ -24,6 +24,7 @@ export class ZipDownloadAdapter extends CodeAdapter {
     icon: 'https://cdn-icons-png.flaticon.com/512/337/337946.png',
     homepage: '',
     capabilities: ['article'],
+    needsReview: false,
   }
 
   /**

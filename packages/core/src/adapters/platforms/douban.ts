@@ -28,6 +28,7 @@ export class DoubanAdapter extends CodeAdapter {
     icon: 'https://www.douban.com/favicon.ico',
     homepage: 'https://www.douban.com/note/create',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 豆瓣使用 Markdown 格式 (转换为 Draft.js) */

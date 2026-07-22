@@ -15,6 +15,7 @@ export class CnblogsAdapter extends CodeAdapter {
     icon: 'https://www.cnblogs.com/favicon.ico',
     homepage: 'https://www.cnblogs.com',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 博客园使用 Markdown 格式 */

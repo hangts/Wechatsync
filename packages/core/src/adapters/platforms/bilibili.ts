@@ -22,6 +22,7 @@ export class BilibiliAdapter extends CodeAdapter {
     icon: 'https://www.bilibili.com/favicon.ico',
     homepage: 'https://member.bilibili.com/platform/upload/text',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: B站使用 HTML，移除外链 */

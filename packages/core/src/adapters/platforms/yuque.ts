@@ -26,6 +26,7 @@ export class YuqueAdapter extends CodeAdapter {
     icon: 'https://gw.alipayobjects.com/zos/rmsportal/UTjFYEzMSYVwzxIGVhMu.png',
     homepage: 'https://www.yuque.com/dashboard',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 语雀使用 Markdown 格式 (转换为 lake) */

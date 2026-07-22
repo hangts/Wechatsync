@@ -66,6 +66,8 @@ export interface PlatformMeta {
   icon: string
   homepage: string
   capabilities: PlatformCapability[]
+  /** 发布后是否需要审核（如百家号等平台） */
+  needsReview: boolean
 }
 
 /**

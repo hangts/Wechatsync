@@ -43,6 +43,8 @@ interface GenAuraPlatformMeta {
   supported: boolean;
   /** 用于 Cookie 域名匹配的根域名（如 juejin.cn、zhihu.com、qq.com） */
   host: string;
+  /** 发布后是否需要审核 */
+  needsReview?: boolean;
 }
 
 /** GenAura 登录态检测结果 */
@@ -136,6 +138,7 @@ export function toGenAuraPlatformMeta(meta: PlatformMeta): GenAuraPlatformMeta {
     icon: meta.icon,
     supported: meta.capabilities.includes("article"),
     host: extractDomain(meta.homepage),
+    needsReview: meta.needsReview,
   };
 }
 

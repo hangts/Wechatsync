@@ -100,6 +100,7 @@ export class JuejinAdapter extends CodeAdapter {
     icon: 'https://lf-web-assets.juejin.cn/obj/juejin-web/xitu_juejin_web/static/favicons/favicon-32x32.png',
     homepage: 'https://juejin.cn',
     capabilities: ['article', 'draft', 'image_upload', 'categories', 'tags', 'cover'],
+    needsReview: true,
   }
 
   /** 预处理配置: 掘金使用 Markdown 格式 */

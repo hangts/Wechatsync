@@ -51,6 +51,7 @@ export class WeixinAdapter extends CodeAdapter {
     icon: 'https://mp.weixin.qq.com/favicon.ico',
     homepage: 'https://mp.weixin.qq.com',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: true,
   }
 
   /** 预处理配置: 微信公众号使用 HTML 格式，移除非微信域名链接，压缩标签间空白避免 ProseMirror 产生空节点 */

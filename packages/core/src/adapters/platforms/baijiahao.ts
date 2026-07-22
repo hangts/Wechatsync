@@ -21,6 +21,7 @@ export class BaijiahaoAdapter extends CodeAdapter {
     icon: 'https://www.baidu.com/favicon.ico',
     homepage: 'https://baijiahao.baidu.com/',
     capabilities: ['article', 'draft', 'image_upload'],
+    needsReview: false,
   }
 
   /** 预处理配置: 百家号使用 HTML 格式 */
