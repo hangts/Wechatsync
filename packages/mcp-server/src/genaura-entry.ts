@@ -348,23 +348,25 @@ async function buildDeps(): Promise<CallToolDeps> {
 
   // 导入 Wechatsync 全部公开文章适配器（跳过 ZipDownloadAdapter，非发布用途）
   const {
-    JuejinAdapter, ZhihuAdapter, CSDNAdapter,
-    WeiboAdapter, BilibiliAdapter, BaijiahaoAdapter,
-    YuqueAdapter, WeixinAdapter, Cto51Adapter,
-    ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
-    CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
-    SohuAdapter, WoshipmAdapter, EastmoneyAdapter,
-    ToutiaoAdapter,
+    JuejinAdapter,  CSDNAdapter,BaijiahaoAdapter,SohuAdapter, 
+    // ZhihuAdapter,
+    // WeiboAdapter, BilibiliAdapter, 
+    // YuqueAdapter, WeixinAdapter, Cto51Adapter,
+    // ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
+    // CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
+    // WoshipmAdapter, EastmoneyAdapter,
+    // ToutiaoAdapter,
   } = await import("@wechatsync/core");
 
   // 适配器构造函数无参，meta 为类实例属性；registry 在 get() 中调用 init(runtime) 注入运行时
   const AdapterClasses = [
-    BaijiahaoAdapter,SohuAdapter,CSDNAdapter,JuejinAdapter,ToutiaoAdapter,ZhihuAdapter, 
-    WeiboAdapter, BilibiliAdapter, 
-    YuqueAdapter, WeixinAdapter, Cto51Adapter,
-    ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
-    CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
-    WoshipmAdapter, EastmoneyAdapter
+    BaijiahaoAdapter,SohuAdapter,CSDNAdapter,JuejinAdapter,
+    // ToutiaoAdapter,ZhihuAdapter, 
+    // WeiboAdapter, BilibiliAdapter, 
+    // YuqueAdapter, WeixinAdapter, Cto51Adapter,
+    // ImoocAdapter, OschinaAdapter, SegmentfaultAdapter,
+    // CnblogsAdapter, DoubanAdapter, XueqiuAdapter,
+    // WoshipmAdapter, EastmoneyAdapter
   ];
 
   // const AdapterClasses = [
