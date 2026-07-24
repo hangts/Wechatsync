@@ -19,7 +19,7 @@ export class CSDNAdapter extends CodeAdapter {
     id: 'csdn',
     name: 'CSDN',
     icon: 'https://g.csdnimg.cn/static/logo/favicon32.ico',
-    homepage: 'https://editor.csdn.net/md/',
+    homepage: 'https://www.csdn.net/',
     capabilities: ['article', 'draft', 'image_upload', 'tags'],
     needsReview: false,
   }
