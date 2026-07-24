@@ -45,36 +45,8 @@ import {
   EastmoneyAdapter,
 } from '@wechatsync/core'
 
-// 私有适配器 - private/ 目录通过 git submodule 管理
-const privateModules = import.meta.glob<Record<string, unknown>>(
-  '@wechatsync/core/adapters/platforms/private/*.ts',
-  { eager: true }
-)
-
 // 适配器构造函数类型
 type AdapterConstructor = new (...args: unknown[]) => PlatformAdapter
-
-// 从 glob 结果中提取适配器类
-function getPrivateAdapters(): AdapterConstructor[] {
-  const adapters: AdapterConstructor[] = []
-  for (const mod of Object.values(privateModules)) {
-    for (const [name, exported] of Object.entries(mod as Record<string, unknown>)) {
-      // 检查是否是类（函数）且名称以 Adapter 结尾
-      if (typeof exported === 'function' && name.endsWith('Adapter')) {
-        try {
-          // 尝试实例化检查是否有 meta 属性
-          const instance = new (exported as AdapterConstructor)()
-          if (instance && (instance as unknown as { meta?: unknown }).meta) {
-            adapters.push(exported as AdapterConstructor)
-          }
-        } catch {
-          // 实例化失败，跳过（文件可能不存在或格式不对）
-        }
-      }
-    }
-  }
-  return adapters
-}
 
 // 所有适配器类列表
 const ADAPTER_CLASSES: AdapterConstructor[] = [
@@ -97,7 +69,6 @@ const ADAPTER_CLASSES: AdapterConstructor[] = [
   CnblogsAdapter,
   ZipDownloadAdapter,
   EastmoneyAdapter,
-  ...getPrivateAdapters(),
 ]
 
 // 适配器注册条目 (类型安全)
