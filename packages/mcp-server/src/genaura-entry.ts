@@ -109,15 +109,14 @@ export interface CallToolDeps {
 // ============================================================================
 
 /**
- * 从 loginUrl 中提取根域名用于 Cookie 匹配。
- * 取 hostname 最后两段（如 juejin.cn、zhihu.com、qq.com），
- * 适用于所有发布平台（.cn / .com / .net），无需 psl 库。
+ * 从 loginUrl 中提取域名用于 Cookie 匹配。
+ * 返回完整 hostname（去掉 www. 前缀），如 baijiahao.baidu.com、juejin.cn。
+ * 避免仅取最后两段导致三级域名（baijiahao.baidu.com → baidu.com）误匹配其他子站。
  */
 function extractDomain(loginUrl: string): string {
   try {
     const hostname = new URL(loginUrl).hostname;
-    const parts = hostname.split(".");
-    return parts.slice(-2).join(".");
+    return hostname.replace(/^www\./, "");
   } catch {
     return "";
   }
