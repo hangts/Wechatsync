@@ -77,7 +77,7 @@ export class SohuAdapter extends CodeAdapter {
         }
       }
 
-      logger.debug('checkAuth response:', res)
+      // logger.debug('checkAuth response:', res)
 
       if (res.code !== 2000000 || !res.data?.data?.[0]?.accounts?.length) {
         return { isAuthenticated: false }
@@ -130,17 +130,17 @@ export class SohuAdapter extends CodeAdapter {
         const cookieValue = await this.runtime.getCookie('.sohu.com', 'mp-cv')
         if (cookieValue) {
           this.spCm = cookieValue
-          logger.debug('Got sp-cm from cookie:', this.spCm)
+          // logger.debug('Got sp-cm from cookie:', this.spCm)
           return
         }
       }
       // fallback: 生成一个
       this.spCm = `100-${Date.now()}-${generateDeviceId()}`
-      logger.debug('Generated sp-cm:', this.spCm)
+      // logger.debug('Generated sp-cm:', this.spCm)
     } catch (error) {
       // fallback: 生成一个
       this.spCm = `100-${Date.now()}-${generateDeviceId()}`
-      logger.debug('Fallback sp-cm:', this.spCm)
+      // logger.debug('Fallback sp-cm:', this.spCm)
     }
   }
 
@@ -169,6 +169,20 @@ export class SohuAdapter extends CodeAdapter {
         }
       )
 
+      // ====== 封面图处理 ======
+      let coverUrl = ''
+      if (article.coverImages && article.coverImages.length > 0) {
+        // logger.debug(`Cover images count: ${article.coverImages.length}, first image type: ${article.coverImages[0].substring(0, 30)}...`)
+        try {
+          coverUrl = await this.uploadCoverImage(article.coverImages[0])
+          // logger.debug('Cover upload success, coverUrl:', coverUrl)
+        } catch (e) {
+          logger.error('封面上传失败:', e)
+        }
+      } else {
+        // logger.debug('No cover images provided, skipping cover upload')
+      }
+
       // 4. 保存草稿 (v2 API - JSON 格式)
       const postData = {
         title: article.title,
@@ -181,7 +195,7 @@ export class SohuAdapter extends CodeAdapter {
         columnNewsIds: [],
         businessCode: 0,
         declareOriginal: false,
-        cover: '',
+        cover: coverUrl,
         topicIds: [],
         isAd: 0,
         userLabels: '[]',
@@ -216,7 +230,7 @@ export class SohuAdapter extends CodeAdapter {
         msg?: string
       }
 
-      logger.debug(' Save response:', res)
+      // logger.debug(' Save response:', res)
 
       if (!res.success) {
         throw new Error(res.msg || '保存失败')
@@ -250,7 +264,7 @@ export class SohuAdapter extends CodeAdapter {
                 columnNewsIds: [],
                 businessCode: 0,
                 declareOriginal: false,
-                cover: null,
+                cover: coverUrl || null,
                 topicIds: [],
                 isAd: 0,
                 userLabels: '[]',
@@ -358,7 +372,7 @@ export class SohuAdapter extends CodeAdapter {
       msg?: string
     }
 
-    logger.debug(' Image upload response:', res)
+    // logger.debug(' Image upload response:', res)
     if (!res.url) {
       throw new Error('图片上传失败:'+ (res.msg))
     }
@@ -366,5 +380,186 @@ export class SohuAdapter extends CodeAdapter {
     return {
       url: res.url,
     }
+  }
+
+  /**
+   * 将 base64 data URI 转换为 Blob
+   */
+  protected async dataUriToBlob(dataUri: string): Promise<Blob> {
+    const matches = dataUri.match(/^data:([^;]+);base64,(.+)$/)
+    if (!matches) {
+      throw new Error('无效的封面图数据')
+    }
+    const mimeType = matches[1]
+    const base64Data = matches[2]
+    const byteCharacters = atob(base64Data)
+    const byteArrays: Uint8Array[] = []
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512)
+      const byteNumbers = new Array(slice.length)
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i)
+      }
+      byteArrays.push(new Uint8Array(byteNumbers))
+    }
+    return new Blob(byteArrays as BlobPart[], { type: mimeType })
+  }
+
+  /**
+   * 上传封面图到搜狐号
+   * 流程 (基于抓包日志):
+   * 1. POST /commons/front/outerUpload/image/file -> 上传图片, 返回原始 URL
+   * 2. POST /mpbp/bp/user/resource/add -> 注册资源到媒体库
+   * 3. POST /commons/front/outerUpload/image/thumbnail/url -> 生成缩略图 URL
+   */
+  protected async uploadCoverImage(dataUri: string): Promise<string> {
+    // logger.debug('[Step 1/3] Starting cover image upload, dataUri prefix:', dataUri.substring(0, 50) + '...')
+
+    // 1. 转换 base64 为 Blob 并上传
+    const blob = await this.dataUriToBlob(dataUri)
+    // logger.debug(`[Step 1/3] Blob created: ${blob.size} bytes, type: ${blob.type}`)
+
+    const uploadUrl = `https://mp.sohu.com/commons/front/outerUpload/image/file?accountId=${this.accountInfo!.id}`
+    const formData = new FormData()
+    formData.append('file', blob, 'cover.jpg')
+    formData.append('accountId', this.accountInfo!.id)
+
+    // logger.debug('[Step 1/3] Uploading to:', uploadUrl)
+    const uploadResponse = await this.runtime.fetch(uploadUrl, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'dv-id': this.deviceId,
+        'sp-cm': this.spCm,
+      },
+      body: formData,
+    })
+
+    if (!uploadResponse.ok) {
+      const errText = await uploadResponse.text()
+      throw new Error(`图片上传失败 HTTP ${uploadResponse.status}: ${errText}`)
+    }
+
+    const uploadResult = await uploadResponse.json() as {
+      url?: string
+      width?: number
+      height?: number
+      size?: number
+      type?: string
+      msg?: string
+    }
+
+    // logger.debug('[Step 1/3] Upload response:', uploadResult)
+
+    if (!uploadResult.url) {
+      throw new Error('封面上传失败:' + (uploadResult.msg || '未知错误'))
+    }
+
+    const originalUrl = uploadResult.url
+    const width = uploadResult.width || 560
+    const height = uploadResult.height || 560
+    const imageType = uploadResult.type || 'jpeg'
+    const imageSize = uploadResult.size || 0
+
+    // 2. 注册资源到媒体库
+    // logger.debug('[Step 2/3] Adding resource to media library, accountId:', this.accountInfo!.id)
+    const filename = `cover-${Date.now()}.${imageType}`
+    const showUrl = originalUrl.replace(
+      '//res.mp.sohu.com/',
+      '//res.mp.sohu.com/a_auto,c_zoom,w_0.4/'
+    )
+    const contentItem = {
+      url: originalUrl,
+      showUrl: showUrl,
+      urlOriginal: originalUrl,
+      status: 'resolved',
+      type: imageType,
+      filename: filename,
+      size: imageSize,
+      errorType: '',
+      error: '',
+      description: '',
+      file: {} as Record<string, never>,
+      width: width,
+      height: height,
+      ratio: width / height,
+    }
+
+    const addResourceBody = new URLSearchParams()
+    addResourceBody.set('names', JSON.stringify([filename]))
+    addResourceBody.set('contents', JSON.stringify([contentItem]))
+    addResourceBody.set('accountId', this.accountInfo!.id)
+
+    // logger.debug('[Step 2/3] Add resource body (url-encoded):', addResourceBody.toString())
+
+    const addResponse = await this.runtime.fetch(
+      `https://mp.sohu.com/mpbp/bp/user/resource/add?accountId=${this.accountInfo!.id}`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+          'dv-id': this.deviceId,
+          'sp-cm': this.spCm,
+        },
+        body: addResourceBody.toString(),
+      }
+    )
+
+    if (!addResponse.ok) {
+      const errText = await addResponse.text()
+      throw new Error(`添加资源失败 HTTP ${addResponse.status}: ${errText}`)
+    }
+
+    const addResult = await addResponse.json() as {
+      code?: number
+      success?: boolean
+      msg?: string
+    }
+    // logger.debug('[Step 2/3] Add resource response:', addResult)
+
+    // 3. 获取缩略图 URL（图片已在客户端 3:2 剪裁，直接使用原图）
+    // logger.debug('[Step 3/3] Getting thumbnail URL')
+
+    const thumbnailBody = new URLSearchParams()
+    thumbnailBody.set('url', originalUrl)
+    thumbnailBody.set('accountId', this.accountInfo!.id)
+
+    // logger.debug('[Step 3/3] Thumbnail request body:', thumbnailBody.toString())
+
+    const thumbResponse = await this.runtime.fetch(
+      `https://mp.sohu.com/commons/front/outerUpload/image/thumbnail/url?accountId=${this.accountInfo!.id}`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+          'dv-id': this.deviceId,
+          'sp-cm': this.spCm,
+        },
+        body: thumbnailBody.toString(),
+      }
+    )
+
+    if (!thumbResponse.ok) {
+      const errText = await thumbResponse.text()
+      throw new Error(`缩略图生成失败 HTTP ${thumbResponse.status}: ${errText}`)
+    }
+
+    const thumbResult = await thumbResponse.json() as {
+      url?: string
+      msg?: string
+    }
+    // logger.debug('[Step 3/3] Thumbnail response:', thumbResult)
+
+    if (!thumbResult.url) {
+      throw new Error('封面缩略图生成失败:' + (thumbResult.msg || '未知错误'))
+    }
+
+    // logger.debug('Cover image upload complete, final coverUrl:', thumbResult.url)
+    return thumbResult.url
   }
 }
