@@ -224,6 +224,7 @@ interface SyncArticleArgs {
   content: string;
   title: string;
   tags?: string[];
+  coverImages?: string[];   // 新增：base64 data URI 数组，1~3 张
   platforms: Array<{ code: string; cookies: SerializedCookie[] }>;
   options?: PublishOptions;
 }
@@ -274,7 +275,7 @@ export async function handleCallTool(
     }
 
     case "sync_article": {
-      const { content, title, tags, platforms } = args as SyncArticleArgs;
+      const { content, title, tags, coverImages, platforms } = args as SyncArticleArgs;
       const rawOptions = (args as Record<string, unknown>).options as Record<string, unknown> | undefined;
       // publishDirectly=true → draftOnly=false（正式发布）；否则 draftOnly=true（保存为草稿）
       const publishDirectly = rawOptions?.publishDirectly === true;
@@ -295,7 +296,7 @@ export async function handleCallTool(
           }
           deps.setCookieContext(adapter.meta.homepage, cookies);
           try {
-            const article: Article = { title, markdown: content, html: deps.markdownToHtml(content), tags };
+                        const article: Article = { title, markdown: content, html: deps.markdownToHtml(content), tags, coverImages };
             const sr = await adapter.publish(article, { draftOnly });
             if (!sr.success) {
               process.stderr.write(`[genaura-entry] sync_article 平台 ${code} 适配器返回失败: ${sr.error ?? "(无错误信息)"}\n`);
@@ -450,6 +451,8 @@ async function main(): Promise<void> {
           properties: {
             content: { type: "string" },
             title: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            coverImages: { type: "array", items: { type: "string" } },
             platforms: { type: "array" },
             options: { type: "object" },
           },
