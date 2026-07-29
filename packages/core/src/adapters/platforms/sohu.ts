@@ -513,11 +513,11 @@ export class SohuAdapter extends CodeAdapter {
       throw new Error(`添加资源失败 HTTP ${addResponse.status}: ${errText}`)
     }
 
-    const addResult = await addResponse.json() as {
-      code?: number
-      success?: boolean
-      msg?: string
-    }
+    // const addResult = await addResponse.json() as {
+    //   code?: number
+    //   success?: boolean
+    //   msg?: string
+    // }
     // logger.debug('[Step 2/3] Add resource response:', addResult)
 
     // 3. 获取缩略图 URL（图片已在客户端 3:2 剪裁，直接使用原图）
