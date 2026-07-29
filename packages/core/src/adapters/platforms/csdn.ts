@@ -162,7 +162,7 @@ export class CSDNAdapter extends CodeAdapter {
       ? `GET\n*/*\n\n\n\nx-ca-key:${this.API_KEY}\nx-ca-nonce:${nonce}\n${apiPath}`
       : `POST\n*/*\n\napplication/json\n\nx-ca-key:${this.API_KEY}\nx-ca-nonce:${nonce}\n${apiPath}`
 
-    logger.debug('Sign string:', JSON.stringify(signStr))
+    // logger.debug('Sign string:', JSON.stringify(signStr))
 
     const signature = await this.hmacSha256(signStr, this.API_SECRET)
 
@@ -184,6 +184,8 @@ export class CSDNAdapter extends CodeAdapter {
   async publish(article: Article, options?: PublishOptions): Promise<SyncResult> {
     return this.withHeaderRules(this.HEADER_RULES, async () => {
       logger.info('Starting publish...')
+      logger.debug('[Step 1/4] Publish info: title="%s", tags=%s, coverImages=%d, draftOnly=%s',
+        article.title, article.tags?.join(','), article.coverImages?.length || 0, options?.draftOnly)
 
       // 1. 确保已登录
       if (!this.userInfo) {
@@ -195,6 +197,7 @@ export class CSDNAdapter extends CodeAdapter {
 
       // 2. 处理图片
       let markdown = article.markdown || ''
+      // logger.debug('[Step 1/4] Processing inline images, markdown length=%d', markdown.length)
       markdown = await this.processImages(
         markdown,
         (src) => this.uploadImageByUrl(src),
@@ -204,14 +207,30 @@ export class CSDNAdapter extends CodeAdapter {
         }
       )
 
+      // ====== 封面图处理 ======
+      let uploadedCoverUrls: string[] = []
+      if (article.coverImages && article.coverImages.length > 0) {
+        // logger.debug('[Step 1/4] Uploading cover image, dataUri prefix: %s...', article.coverImages[0].substring(0, 50))
+        try {
+          const url = await this.uploadCoverImage(article.coverImages[0])
+          uploadedCoverUrls.push(url)
+          logger.debug('[Step 1/4] Cover image upload success: %s', url)
+        } catch (e) {
+          logger.error('[Step 1/4] 封面上传失败:', e)
+        }
+      } else {
+        logger.debug('[Step 1/4] No cover images provided, skipping')
+      }
+
       const htmlContent = article.html || ''
       const isPublish = options?.draftOnly === false
 
-      // Step 1: 保存草稿 → 获取 article_id
+      // Step 2: 保存草稿 → 获取 article_id
       const draftApiPath = '/blog-console-api/v3/mdeditor/saveArticle'
       const draftHeaders = await this.signRequest(draftApiPath)
 
-      logger.debug('Saving draft...')
+      logger.debug('[Step 2/4] Saving draft, cover_images=%s',
+        JSON.stringify(uploadedCoverUrls))
       const draftResponse = await this.runtime.fetch(
         `https://bizapi.csdn.net${draftApiPath}`,
         {
@@ -232,7 +251,7 @@ export class CSDNAdapter extends CodeAdapter {
             authorized_status: false,
             not_auto_saved: '1',
             source: 'pc_mdeditor',
-            cover_images: [],
+            cover_images: uploadedCoverUrls,
             cover_type: 1,
             is_new: 1,
             vote_id: 0,
@@ -250,7 +269,8 @@ export class CSDNAdapter extends CodeAdapter {
         data?: { id: string }
       }
 
-      logger.debug('Save draft response:', draftRes)
+      logger.debug('[Step 2/4] Save draft response: code=%d, article_id=%s',
+        draftRes.code, draftRes.data?.id)
 
       if (draftRes.code !== 200 || !draftRes.data?.id) {
         throw new Error(draftRes.msg || draftRes.message || '保存草稿失败')
@@ -261,6 +281,7 @@ export class CSDNAdapter extends CodeAdapter {
       // 如果只保存草稿，直接返回
       if (!isPublish) {
         const draftUrl = `https://editor.csdn.net/md?articleId=${postId}`
+        logger.debug('[Step 2/4] Draft only mode, draftUrl=%s', draftUrl)
         return this.createResult(true, {
           postId,
           postUrl: draftUrl,
@@ -269,12 +290,13 @@ export class CSDNAdapter extends CodeAdapter {
         })
       }
 
-      // Step 2: 通过 postedit API 发布
+      // Step 3: 通过 postedit API 发布
       const publishApiPath = '/blog-console-api/v1/postedit/saveArticle'
       const publishHeaders = await this.signRequest(publishApiPath)
       const description = this.extractDescription(markdown || htmlContent)
 
-      logger.debug('Publishing article...')
+      logger.debug('[Step 3/4] Publishing article, article_id=%s, cover_images=%s',
+        postId, JSON.stringify(uploadedCoverUrls))
       const publishResponse = await this.runtime.fetch(
         `https://bizapi.csdn.net${publishApiPath}`,
         {
@@ -299,7 +321,7 @@ export class CSDNAdapter extends CodeAdapter {
             source: 'pc_postedit',
             not_auto_saved: 1,
             creator_activity_id: '',
-            cover_images: [],
+            cover_images: uploadedCoverUrls,
             cover_type: 1,
             vote_id: 0,
             resource_id: '',
@@ -328,12 +350,14 @@ export class CSDNAdapter extends CodeAdapter {
         }
       }
 
-      logger.debug('Publish response:', publishRes)
+      logger.debug('[Step 3/4] Publish response: code=%d, msg=%s, url=%s',
+        publishRes.code, publishRes.msg || publishRes.message, publishRes.data?.url)
 
       if (publishRes.code !== 200 || !publishRes.data?.url) {
         throw new Error(publishRes.msg || publishRes.message || '发布失败')
       }
 
+      logger.debug('[Step 4/4] Publish success, postUrl=%s', publishRes.data.url)
       return this.createResult(true, {
         postId,
         postUrl: publishRes.data.url,
@@ -366,6 +390,7 @@ export class CSDNAdapter extends CodeAdapter {
    */
   async uploadImage(file: Blob, _filename?: string): Promise<string> {
     return this.withHeaderRules(this.HEADER_RULES, async () => {
+      // logger.debug('uploadImage: file type=%s, size=%d bytes', file.type, file.size)
       // 转为 data URI 然后调用 uploadImageByUrl
       const dataUri = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -374,20 +399,38 @@ export class CSDNAdapter extends CodeAdapter {
         reader.readAsDataURL(file)
       })
       const result = await this.uploadImageByUrl(dataUri)
+      // logger.debug('uploadImage: success, url=%s', result.url)
       return result.url
     })
   }
 
   /**
+   * 上传封面图到 CSDN 图床（OBS）
+   * 复用 uploadImageByUrl 将 base64 data URI 上传到 OBS，返回可公开访问的图片 URL
+   */
+  protected async uploadCoverImage(dataUri: string): Promise<string> {
+    // logger.debug('uploadCoverImage: dataUri prefix=%s...', dataUri.substring(0, 50))
+    const result = await this.uploadImageByUrl(dataUri)
+    // logger.debug('uploadCoverImage: success, url=%s', result.url)
+    return result.url
+  }
+
+  /**
    * 通过 URL 上传图片
+   * 三步流程：
+   *   [Step 1/3] 下载图片 → 获取 Blob
+   *   [Step 2/3] 获取 OBS 上传签名
+   *   [Step 3/3] 上传到华为云 OBS → 返回公开 URL
    */
   protected async uploadImageByUrl(src: string): Promise<ImageUploadResult> {
     // 1. 下载图片
+    // logger.debug('[uploadImage 1/3] Downloading image from src: %s...', src.substring(0, 80))
     const imageResponse = await fetch(src)
     if (!imageResponse.ok) {
       throw new Error('图片下载失败: ' + src)
     }
     const imageBlob = await imageResponse.blob()
+    // logger.debug('[uploadImage 1/3] Downloaded: blob type=%s, size=%d bytes', imageBlob.type, imageBlob.size)
 
     // 2. 获取文件扩展名
     const ext = src.split('.').pop()?.toLowerCase()?.split('?')[0] || 'jpg'
@@ -397,6 +440,7 @@ export class CSDNAdapter extends CodeAdapter {
     const apiPath = '/resource-api/v1/image/direct/upload/signature'
     const headers = await this.signRequest(apiPath, 'POST')
 
+    // logger.debug('[uploadImage 2/3] Getting upload signature, appName=direct_blog_markdown, suffix=%s', validExt)
     const signatureRes = await this.runtime.fetch(
       `https://bizapi.csdn.net${apiPath}`,
       {
@@ -434,10 +478,11 @@ export class CSDNAdapter extends CodeAdapter {
       }
     }
 
-    logger.debug('Upload signature response:', signatureData)
+    // logger.debug('[uploadImage 2/3] Signature response: code=%d, filePath=%s, host=%s',
+    //   signatureData.code, signatureData.data?.filePath, signatureData.data?.host)
 
     if (signatureData.code !== 200 || !signatureData.data) {
-      logger.warn('Failed to get upload signature, using original URL')
+      logger.warn('[uploadImage 2/3] Failed to get upload signature, using original URL')
       return { url: src }
     }
 
@@ -445,6 +490,7 @@ export class CSDNAdapter extends CodeAdapter {
     const customParam = uploadData.customParam
 
     // 4. 上传到华为云 OBS
+    // logger.debug('[uploadImage 3/3] Uploading to OBS, host=%s, filePath=%s', uploadData.host, uploadData.filePath)
     const formData = new FormData()
     formData.append('key', uploadData.filePath)
     formData.append('policy', uploadData.policy)
@@ -472,10 +518,11 @@ export class CSDNAdapter extends CodeAdapter {
       data?: { imageUrl: string }
     }
 
-    logger.debug('OBS upload response:', obsRes)
+    // logger.debug('[uploadImage 3/3] OBS upload response: code=%d, imageUrl=%s',
+    //   obsRes.code, obsRes.data?.imageUrl)
 
     if (obsRes.code !== 200 || !obsRes.data?.imageUrl) {
-      logger.warn('OBS upload failed, using original URL')
+      logger.warn('[uploadImage 3/3] OBS upload failed, using original URL')
       return { url: src }
     }
 
