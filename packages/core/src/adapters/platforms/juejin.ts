@@ -159,7 +159,7 @@ export class JuejinAdapter extends CodeAdapter {
 
       return { isAuthenticated: false }
     } catch (error) {
-      logger.debug('checkAuth: not logged in -', error)
+      logger.warn('checkAuth: not logged in -', error)
       return { isAuthenticated: false, error: (error as Error).message }
     }
   }
@@ -195,7 +195,7 @@ export class JuejinAdapter extends CodeAdapter {
     }
 
     this.cachedCsrfToken = parts[1]
-    logger.debug('Got CSRF token:', this.cachedCsrfToken.substring(0, 10) + '...')
+    // logger.debug('Got CSRF token:', this.cachedCsrfToken.substring(0, 10) + '...')
     return this.cachedCsrfToken
   }
 
@@ -223,6 +223,23 @@ export class JuejinAdapter extends CodeAdapter {
         }
       )
 
+      // 4. 处理封面图
+      let coverImageUrl = article.cover || ''
+      if (article.coverImages && article.coverImages.length > 0) {
+        // logger.debug('[Cover] Uploading cover image, dataUri prefix: %s..., count: %d',
+        //   article.coverImages[0].substring(0, 50), article.coverImages.length)
+        try {
+          // 掘金仅支持单封面，取第一张
+          coverImageUrl = await this.uploadCoverImage(article.coverImages[0])
+          // logger.debug('[Cover] Upload success, coverImageUrl: %s', coverImageUrl.substring(0, 80) + '...')
+        } catch (e) {
+          logger.error('[Cover] 封面图上传失败:', e)
+        }
+      } else {
+        // logger.debug('[Cover] No cover images provided, using article.cover: %s',
+        //   article.cover ? article.cover.substring(0, 50) + '...' : '(empty)')
+      }
+
       // 6. 创建草稿 (参数来自 DSL juejin.yaml + juejin.transform.ts prepareBody)
       const createResponse = await this.runtime.fetch(
         'https://api.juejin.cn/content_api/v1/article_draft/create',
@@ -236,7 +253,7 @@ export class JuejinAdapter extends CodeAdapter {
           body: JSON.stringify({
             brief_content: '',
             category_id: '0',
-            cover_image: '',
+            cover_image: coverImageUrl,
             edit_type: 10,
             html_content: 'deprecated',
             link_url: '',
@@ -249,7 +266,7 @@ export class JuejinAdapter extends CodeAdapter {
 
       // 检查响应状态和内容
       const responseText = await createResponse.text()
-      logger.debug('Create draft response:', createResponse.status, responseText.substring(0, 300))
+      // logger.debug('Create draft response:', createResponse.status, responseText.substring(0, 300))
 
       if (!createResponse.ok) {
         throw new Error(`创建草稿失败: ${createResponse.status} - ${responseText}`)
@@ -272,7 +289,7 @@ export class JuejinAdapter extends CodeAdapter {
       }
 
       const draftId = createData.data.id
-      logger.debug('Draft created:', draftId)
+      logger.info('Draft created:', draftId)
 
       const draftUrl = `https://juejin.cn/editor/drafts/${draftId}`
 
@@ -284,7 +301,7 @@ export class JuejinAdapter extends CodeAdapter {
         category_id: article.category || '6809637772874219534',
         tag_ids: article.tags && article.tags.length > 0 ? article.tags : ['6809640621406421006'],
         link_url: '',
-        cover_image: article.cover || '',
+        cover_image: coverImageUrl,
         is_gfw: 0,
         title: article.title,
         brief_content: briefContent,
@@ -311,7 +328,7 @@ export class JuejinAdapter extends CodeAdapter {
       )
 
       const updateText = await updateResponse.text()
-      logger.debug('Update draft response:', updateResponse.status, updateText.substring(0, 300))
+      // logger.debug('Update draft response:', updateResponse.status, updateText.substring(0, 300))
 
       if (!updateResponse.ok) {
         throw new Error(`更新草稿失败: ${updateResponse.status} - ${updateText}`)
@@ -345,7 +362,7 @@ export class JuejinAdapter extends CodeAdapter {
             }
           )
           const publishText = await publishResponse.text()
-          logger.debug('Publish response:', publishResponse.status, publishText.substring(0, 200))
+          // logger.debug('Publish response:', publishResponse.status, publishText.substring(0, 200))
 
           const publishData = JSON.parse(publishText) as { err_no?: number; err_msg?: string; data?: { article_id: string } }
 
@@ -369,7 +386,7 @@ export class JuejinAdapter extends CodeAdapter {
 
           const previewUrl = `https://juejin.cn/spost/${articleId}`
           const articleUrl = `https://juejin.cn/post/${articleId}`
-          logger.debug('Publish success:', articleUrl)
+          logger.info('Publish success:', articleUrl)
           return this.createResult(true, {
             postId: articleId,
             postUrl: articleUrl,
@@ -419,11 +436,11 @@ export class JuejinAdapter extends CodeAdapter {
 
       if (src.startsWith('data:')) {
         // data URI 直接转 blob
-        logger.debug('Detected data URI, converting to blob')
+        // logger.debug('Detected data URI, converting to blob')
         blob = await fetch(src).then(r => r.blob())
       } else {
         // 远程 URL：先下载再上传
-        logger.debug('Downloading remote image:', src.substring(0, 80))
+        // logger.debug('Downloading remote image:', src.substring(0, 80))
         const response = await this.runtime.fetch(src, {
           method: 'GET',
         })
@@ -438,7 +455,7 @@ export class JuejinAdapter extends CodeAdapter {
 
       // 使用 ImageX 流程上传
       const url = await this.uploadImageBinaryInternal(blob)
-      logger.debug('Uploaded image:', src.substring(0, 50), '->', url)
+      // logger.debug('Uploaded image:', src.substring(0, 50), '->', url)
       return { url }
     } catch (error) {
       logger.warn('Failed to upload image by URL:', src, error)
@@ -465,7 +482,7 @@ export class JuejinAdapter extends CodeAdapter {
     })
 
     const responseText = await response.text()
-    logger.debug('gen_token response:', responseText.substring(0, 500))
+    // logger.debug('gen_token response:', responseText.substring(0, 500))
 
     let data: ImageXTokenResponse
     try {
@@ -494,7 +511,7 @@ export class JuejinAdapter extends CodeAdapter {
     }
     this.imageXTokenExpiry = expiredTime
 
-    logger.debug('Got ImageX token, expires at:', tokenData.ExpiredTime)
+    // logger.debug('Got ImageX token, expires at:', tokenData.ExpiredTime)
 
     return this.cachedImageXToken
   }
@@ -554,7 +571,7 @@ export class JuejinAdapter extends CodeAdapter {
     const uint8Array = new Uint8Array(arrayBuffer)
     const crc32Value = crc32(uint8Array)
 
-    logger.debug('Uploading to TOS:', uploadUrl, 'size:', file.size, 'crc32:', crc32Value)
+    // logger.debug('Uploading to TOS:', uploadUrl, 'size:', file.size, 'crc32:', crc32Value)
 
     // 上传文件
     const response = await this.runtime.fetch(uploadUrl, {
@@ -572,7 +589,7 @@ export class JuejinAdapter extends CodeAdapter {
       throw new Error(`TOS upload failed: ${response.status} ${text}`)
     }
 
-    logger.debug('TOS upload success')
+    // logger.debug('TOS upload success')
   }
 
   /**
@@ -653,14 +670,14 @@ export class JuejinAdapter extends CodeAdapter {
 
     // 2. 申请上传
     const uploadAddress = await this.applyImageUpload(token)
-    logger.debug('Apply upload success, session:', uploadAddress.SessionKey.substring(0, 50) + '...')
+    // logger.debug('Apply upload success, session:', uploadAddress.SessionKey.substring(0, 50) + '...')
 
     // 3. 上传到 TOS
     await this.uploadToTOS(uploadAddress, file)
 
     // 4. 提交上传
     const commitResult = await this.commitImageUpload(token, uploadAddress.SessionKey)
-    logger.debug('Commit upload success:', commitResult.Results?.[0]?.Uri)
+    logger.info('Commit upload success:', commitResult.Results?.[0]?.Uri)
 
     // 5. 获取图片 URL
     const storeUri = uploadAddress.StoreInfos[0]?.StoreUri
@@ -669,9 +686,24 @@ export class JuejinAdapter extends CodeAdapter {
     }
 
     const imageUrl = await this.getImageUrl(storeUri)
-    logger.debug('Got image URL:', imageUrl)
+    // logger.debug('Got image URL:', imageUrl)
 
     return imageUrl
+  }
+
+  /**
+   * 上传封面图到掘金图床（ImageX）
+   * 将 base64 data URI 上传至 ImageX，返回签名 URL
+   */
+  protected async uploadCoverImage(dataUri: string): Promise<string> {
+    // logger.debug('[Cover] uploadCoverImage: converting data URI to blob, prefix: %s...', dataUri.substring(0, 50))
+    // 将 data URI 转换为 Blob
+    const blob = await fetch(dataUri).then(r => r.blob())
+    // logger.debug('[Cover] Blob created: size=%d, type=%s', blob.size, blob.type || 'unknown')
+    // 复用 ImageX 上传管线
+    const url = await this.uploadImageBinaryInternal(blob)
+    // logger.debug('[Cover] ImageX upload complete, URL: %s', url.substring(0, 80) + '...')
+    return url
   }
 
   /**
